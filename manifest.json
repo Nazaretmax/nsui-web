@@ -1,0 +1,30 @@
+{
+  "name": "NSUI Web — GBA to CIA Injector",
+  "short_name": "NSUI Web",
+  "description": "Converti ROM GBA in CIA per Nintendo 3DS Virtual Console direttamente nel browser",
+  "start_url": "/nsui-web/",
+  "scope": "/nsui-web/",
+  "display": "standalone",
+  "background_color": "#05080f",
+  "theme_color": "#05080f",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "utilities",
+    "games"
+  ],
+  "lang": "it"
+}

@@ -1,1221 +1,1068 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NSUI Web — GBA to CIA Injector</title>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="description" content="NSUI Web v3 — Converti ROM GBA in CIA per Nintendo 3DS Virtual Console. Config automatica. 100% client-side.">
+<meta name="theme-color" content="#05080f">
+<title>NSUI Web — GBA to CIA</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#080b10;--bg2:#0c0f16;--panel:#0f1320;--border:#1a2030;--border2:#222d40;--accent:#00e5ff;--accent2:#ff6b35;--green:#39ff6e;--yellow:#ffd60a;--red:#ff3d5a;--purple:#bf5fff;--text:#c0d0e8;--text2:#5a6e88;--text3:#2e3f56;}
-*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#05080f;--surf:#0d1525;--s2:#111d30;
+  --b:rgba(255,255,255,.06);--b2:rgba(255,255,255,.11);--b3:rgba(255,255,255,.18);
+  --cyan:#00eeff;--cd:rgba(0,238,255,.13);--cg:0 0 26px rgba(0,238,255,.2);
+  --green:#00ff88;--gd:rgba(0,255,136,.1);
+  --amber:#ffb800;--ad:rgba(255,184,0,.1);
+  --red:#ff3355;--rd:rgba(255,51,85,.1);
+  --text:#c8ddf0;--t2:#516478;--t3:#2e3f54;--t4:#162030;
+  --mono:'JetBrains Mono',monospace;--head:'Syne',sans-serif;--body:'DM Sans',sans-serif;
+  --r:5px;--r2:3px;--fast:.13s;--med:.23s;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
-body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:15px;min-height:100vh;overflow-x:hidden;}
-body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.07) 3px,rgba(0,0,0,0.07) 4px);pointer-events:none;z-index:9999;}
-body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.025) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0;}
+body{font-family:var(--body);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+body::before{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.055) 3px,rgba(0,0,0,.055) 4px);}
+.gbg{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(0,238,255,.022) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(0,238,255,.022) 1px,transparent 1px);
+  background-size:46px 46px;}
 
 /* HEADER */
-header{position:relative;z-index:10;background:linear-gradient(180deg,#06080d 0%,var(--bg2) 100%);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:60px;gap:12px;flex-wrap:wrap;}
-header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.35;}
-.logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
-.logo-hex{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),#0055ff);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:flex;align-items:center;justify-content:center;font-family:'Orbitron',sans-serif;font-weight:900;font-size:9px;color:#000;animation:hexGlow 3s ease-in-out infinite;flex-shrink:0;}
-@keyframes hexGlow{0%,100%{filter:drop-shadow(0 0 6px rgba(0,229,255,.6));}50%{filter:drop-shadow(0 0 14px rgba(0,229,255,1));}}
-.logo-text{font-family:'Orbitron',sans-serif;font-weight:900;font-size:15px;color:var(--accent);letter-spacing:2px;}
-.logo-sub{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text2);letter-spacing:3px;margin-top:2px;}
-.hbadges{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
-.hb{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;padding:3px 8px;border-radius:2px;}
-.hb-c{background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.3);color:var(--accent);}
-.hb-g{background:rgba(57,255,110,.1);border:1px solid rgba(57,255,110,.3);color:var(--green);}
-.hb-o{background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.3);color:var(--accent2);}
-.online{display:flex;align-items:center;gap:5px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--green);letter-spacing:1px;}
-.online::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:blink2 2s ease-in-out infinite;}
-@keyframes blink2{0%,100%{opacity:1;}50%{opacity:.3;}}
+header{position:sticky;top:0;z-index:100;background:rgba(5,8,15,.96);border-bottom:1px solid var(--b2);
+  backdrop-filter:blur(14px);padding:0 18px;height:56px;display:flex;align-items:center;
+  justify-content:space-between;gap:10px;}
+header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:.22;}
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;flex-shrink:0;}
+.logo-hex{width:30px;height:30px;background:linear-gradient(135deg,var(--cyan),#2255ff);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:flex;align-items:center;justify-content:center;
+  animation:hpulse 4s ease-in-out infinite;}
+.logo-hex span{font-family:var(--head);font-size:7px;font-weight:800;color:#000;}
+@keyframes hpulse{0%,100%{filter:drop-shadow(0 0 7px rgba(0,238,255,.55));}50%{filter:drop-shadow(0 0 16px rgba(0,238,255,.95));}}
+.logo-title{font-family:var(--head);font-size:14px;font-weight:800;color:var(--cyan);letter-spacing:1.5px;}
+.logo-sub{font-family:var(--mono);font-size:7px;color:var(--t2);letter-spacing:2.5px;margin-top:1px;}
+.hright{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.badge{font-family:var(--mono);font-size:8px;letter-spacing:.8px;padding:2px 7px;border-radius:2px;}
+.bc{background:rgba(0,238,255,.1);border:1px solid rgba(0,238,255,.3);color:var(--cyan);}
+.bg{background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);color:var(--green);}
+.ba{background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.3);color:var(--amber);}
+.dot{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8px;color:var(--green);letter-spacing:.8px;}
+.dot::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 9px var(--green);animation:dblink 2.5s ease-in-out infinite;}
+@keyframes dblink{0%,100%{opacity:1;}50%{opacity:.2;}}
+.hprog{display:none;align-items:center;gap:7px;}
+.hprog.on{display:flex;}
+.hpt{width:70px;height:3px;background:var(--b2);border-radius:2px;overflow:hidden;}
+.hpb{height:100%;background:var(--cyan);transition:width .3s;border-radius:2px;width:0%;}
+.hpc{font-family:var(--mono);font-size:8px;color:var(--cyan);min-width:26px;}
 
 /* LAYOUT */
-.wrap{position:relative;z-index:10;max-width:1180px;margin:0 auto;padding:20px 14px 60px;display:grid;grid-template-columns:1fr 320px;gap:18px;}
-@media(max-width:820px){.wrap{grid-template-columns:1fr;}.sidebar{order:-1;}}
-.main-col{display:flex;flex-direction:column;gap:18px;}
+.app{position:relative;z-index:10;max-width:1140px;margin:0 auto;padding:18px 12px 70px;
+  display:grid;grid-template-columns:1fr 292px;gap:14px;}
+@media(max-width:820px){.app{grid-template-columns:1fr;}.sidebar{order:-1;}}
+.main{display:flex;flex-direction:column;gap:14px;}
 
-/* PANELS */
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden;position:relative;}
-.panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;transition:opacity .3s;}
-.panel:focus-within::before,.panel.lit::before{opacity:1;}
-.ph{display:flex;align-items:center;gap:9px;padding:11px 15px;background:rgba(0,0,0,.35);border-bottom:1px solid var(--border);font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;letter-spacing:2px;color:var(--text2);text-transform:uppercase;}
-.ph-n{width:18px;height:18px;background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.3);border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--accent);flex-shrink:0;}
-.pb{padding:15px;}
-
-/* STEP INDICATOR */
-.step-row{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;}
-.step-pill{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1px;padding:9px 16px;color:var(--text3);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;background:none;border-top:none;border-left:none;border-right:none;cursor:pointer;transition:all .2s;}
-.step-pill:hover{color:var(--text2);}
-.step-pill.on{color:var(--accent);border-bottom-color:var(--accent);}
-.tab-c{display:none;padding:15px;}
-.tab-c.on{display:block;}
+/* PANEL */
+.panel{background:var(--surf);border:1px solid var(--b);border-radius:var(--r);overflow:hidden;position:relative;}
+.panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  opacity:0;transition:opacity var(--med);}
+.panel.lit::before,.panel:focus-within::before{opacity:.65;}
+.panel.lit,.panel:focus-within{border-color:var(--b2);}
+.ph{display:flex;align-items:center;gap:8px;padding:9px 13px;background:rgba(0,0,0,.4);
+  border-bottom:1px solid var(--b);font-family:var(--mono);font-size:8px;font-weight:700;
+  letter-spacing:2px;color:var(--t2);text-transform:uppercase;}
+.phn{width:17px;height:17px;background:rgba(0,238,255,.08);border:1px solid rgba(0,238,255,.22);
+  border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:7px;
+  color:var(--cyan);flex-shrink:0;}
+.phend{margin-left:auto;}
+.pb{padding:13px;}
 
 /* DROPZONE */
-.dz{border:2px dashed var(--border2);border-radius:4px;padding:32px 20px;text-align:center;cursor:pointer;transition:all .25s;position:relative;background:rgba(0,0,0,.2);}
-.dz:hover,.dz.over{border-color:var(--accent);background:rgba(0,229,255,.04);box-shadow:inset 0 0 30px rgba(0,229,255,.05),0 0 20px rgba(0,229,255,.1);}
-.dz.ready{border-color:var(--green);background:rgba(57,255,110,.04);}
-.dz.err{border-color:var(--red);background:rgba(255,61,90,.04);}
+.dz{border:1px dashed var(--b3);border-radius:var(--r);padding:26px 16px;text-align:center;
+  cursor:pointer;transition:all var(--med);position:relative;background:rgba(0,0,0,.18);}
+.dz:hover,.dz.over{border-color:var(--cyan);background:var(--cd);box-shadow:var(--cg);}
+.dz.ok{border-color:var(--green);background:var(--gd);border-style:solid;}
+.dz.err{border-color:var(--red);background:var(--rd);border-style:solid;}
 .dz input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
-.dz-ico{width:48px;height:48px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;}
-.dz-t{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--text);letter-spacing:1px;margin-bottom:6px;}
-.dz-s{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text2);}
-.dz-fmts{display:flex;gap:5px;justify-content:center;margin-top:10px;flex-wrap:wrap;}
-.fmt{font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 7px;background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.2);border-radius:2px;color:var(--accent);}
+.dz-icon{width:38px;height:38px;margin:0 auto 9px;}
+.dz-t{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.8px;color:var(--text);margin-bottom:3px;}
+.dz-s{font-family:var(--mono);font-size:8.5px;color:var(--t2);}
+.dz-fmts{display:flex;gap:5px;justify-content:center;margin-top:8px;flex-wrap:wrap;}
+.fmt{font-family:var(--mono);font-size:8px;padding:2px 6px;background:rgba(0,238,255,.07);
+  border:1px solid rgba(0,238,255,.2);border-radius:2px;color:var(--cyan);}
 
-/* ROM INFO */
-#romInfo{display:none;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:3px;padding:12px;margin-top:10px;}
-#romInfo.show{display:block;animation:fadein .3s;}
-@keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
-.ri-row{display:grid;grid-template-columns:110px 1fr;gap:3px 10px;font-family:'Share Tech Mono',monospace;font-size:10px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);}
-.ri-row:last-child{border:none;}
-.rl{color:var(--text3);letter-spacing:.5px;}
-.rv{color:var(--text);word-break:break-all;}
-.rv.ok{color:var(--green);}
-.rv.warn{color:var(--yellow);}
-.rv.bad{color:var(--red);}
+/* INFO TABLE */
+.itbl{display:none;margin-top:9px;background:rgba(0,0,0,.32);border:1px solid var(--b2);
+  border-radius:var(--r2);overflow:hidden;}
+.itbl.on{display:block;animation:fadeup .22s ease;}
+@keyframes fadeup{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+.ir{display:grid;grid-template-columns:105px 1fr;gap:0 7px;align-items:center;padding:4px 10px;
+  border-bottom:1px solid rgba(255,255,255,.025);font-family:var(--mono);font-size:9px;}
+.ir:last-child{border:none;}
+.ir:hover{background:rgba(255,255,255,.018);}
+.ik{color:var(--t3);letter-spacing:.3px;}
+.iv{color:var(--text);word-break:break-all;}
+.iv.ok{color:var(--green);}.iv.warn{color:var(--amber);}.iv.bad{color:var(--red);}
 
-/* FIELDS */
-.fg{margin-bottom:12px;}
-label{display:block;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--text2);text-transform:uppercase;margin-bottom:5px;}
-.req::after{content:' *';color:var(--accent2);}
-input[type=text],input[type=number],select,textarea{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border2);border-radius:3px;padding:8px 11px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:500;transition:all .2s;outline:none;appearance:none;}
-input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,229,255,.1);background:rgba(0,229,255,.03);}
-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a6e88' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:32px;cursor:pointer;}
-select option{background:#0f1320;}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-@media(max-width:480px){.row2{grid-template-columns:1fr;}}
+/* FORM */
+.fld{margin-bottom:11px;}
+.lbl{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8px;
+  letter-spacing:1.5px;color:var(--t2);text-transform:uppercase;margin-bottom:4px;}
+.req{color:#ff6644;}
+.auto-pill{font-size:7px;letter-spacing:.5px;padding:1px 5px;background:rgba(0,255,136,.1);
+  border:1px solid rgba(0,255,136,.25);border-radius:2px;color:var(--green);}
+input[type=text],input[type=number],select,textarea{width:100%;background:rgba(0,0,0,.48);
+  border:1px solid var(--b2);border-radius:var(--r2);padding:7px 10px;color:var(--text);
+  font-family:var(--body);font-size:13px;font-weight:500;transition:all var(--fast);
+  outline:none;appearance:none;}
+input:focus,select:focus,textarea:focus{border-color:rgba(0,238,255,.45);
+  box-shadow:0 0 0 2px rgba(0,238,255,.07);background:rgba(0,238,255,.02);}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23516478' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center;padding-right:28px;cursor:pointer;}
+select option{background:#0d1525;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+@media(max-width:430px){.row2{grid-template-columns:1fr;}}
+textarea{resize:vertical;min-height:52px;font-family:var(--body);}
+@keyframes autofill-flash{0%{border-color:rgba(0,255,136,.6);background:rgba(0,255,136,.06);}100%{border-color:var(--b2);background:rgba(0,0,0,.48);}}
+.auto-flash{animation:autofill-flash 1.6s ease forwards;}
 
 /* TOGGLE */
-.tog-r{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.tog-r{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.035);}
 .tog-r:last-child{border:none;}
-.tog-lb{font-size:13px;font-weight:500;color:var(--text);}
-.tog-desc{font-size:10px;color:var(--text2);margin-top:1px;font-family:'Share Tech Mono',monospace;}
-.tog{position:relative;width:38px;height:20px;flex-shrink:0;}
+.tl{font-size:13px;font-weight:500;color:var(--text);}.tld{font-family:var(--mono);font-size:8.5px;color:var(--t2);margin-top:1px;}
+.tog{position:relative;width:36px;height:19px;flex-shrink:0;cursor:pointer;}
 .tog input{display:none;}
-.tog-sl{position:absolute;inset:0;background:var(--border2);border-radius:10px;cursor:pointer;transition:.25s;}
-.tog-sl::before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:var(--text3);border-radius:50%;transition:.25s;}
-.tog input:checked+.tog-sl{background:rgba(0,229,255,.2);border:1px solid var(--accent);}
-.tog input:checked+.tog-sl::before{transform:translateX(18px);background:var(--accent);box-shadow:0 0 8px var(--accent);}
+.tog-tr{position:absolute;inset:0;background:var(--b3);border-radius:10px;transition:var(--med);}
+.tog-th{position:absolute;width:13px;height:13px;top:3px;left:3px;background:var(--t3);border-radius:50%;transition:var(--med);}
+.tog input:checked~.tog-tr{background:rgba(0,238,255,.18);border:1px solid rgba(0,238,255,.45);}
+.tog input:checked~.tog-th{transform:translateX(17px);background:var(--cyan);box-shadow:0 0 9px rgba(0,238,255,.55);}
 
-/* COLOR GRID */
-.cgrid{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px;}
-.csw{width:26px;height:26px;border-radius:3px;cursor:pointer;border:2px solid transparent;transition:all .15s;}
-.csw.sel{border-color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.3);}
-.csw:hover{transform:scale(1.15);}
+/* TABS */
+.tabs{display:flex;overflow-x:auto;border-bottom:1px solid var(--b);scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{font-family:var(--mono);font-size:8px;font-weight:500;letter-spacing:1.5px;padding:8px 14px;
+  color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;
+  white-space:nowrap;background:none;border-top:none;border-left:none;border-right:none;
+  transition:color var(--fast);text-transform:uppercase;}
+.tab:hover{color:var(--t2);}
+.tab.on{color:var(--cyan);border-bottom-color:var(--cyan);}
+.tp{display:none;padding:13px;}.tp.on{display:block;}
+
+/* COLORS */
+.cgrid{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;}
+.csw{width:24px;height:24px;border-radius:3px;cursor:pointer;border:2px solid transparent;transition:all var(--fast);}
+.csw:hover{transform:scale(1.18);}
+.csw.on{border-color:rgba(255,255,255,.7);box-shadow:0 0 0 1px rgba(255,255,255,.2);}
 
 /* ICON */
-.icon-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-.icon-prev{width:48px;height:48px;border:1px solid var(--border2);border-radius:3px;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--text3);text-align:center;}
+.icon-row{display:flex;align-items:center;gap:11px;flex-wrap:wrap;}
+.icon-prev{width:48px;height:48px;flex-shrink:0;border:1px solid var(--b2);border-radius:var(--r2);
+  background:rgba(0,0,0,.4);overflow:hidden;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:7px;color:var(--t3);text-align:center;}
 .icon-prev img{width:100%;height:100%;object-fit:cover;}
-.ibtn{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;padding:6px 12px;background:rgba(0,0,0,.4);border:1px solid var(--border2);border-radius:3px;color:var(--text2);cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
-.ibtn:hover{border-color:var(--accent);color:var(--accent);}
+.ibtn{font-family:var(--mono);font-size:8px;padding:5px 9px;background:rgba(0,0,0,.4);
+  border:1px solid var(--b2);border-radius:var(--r2);color:var(--t2);cursor:pointer;
+  transition:all var(--fast);position:relative;overflow:hidden;}
+.ibtn:hover{border-color:var(--cyan);color:var(--cyan);}
 .ibtn input{position:absolute;inset:0;opacity:0;cursor:pointer;}
 
 /* RANGE */
-.rw{display:flex;align-items:center;gap:10px;}
-input[type=range]{flex:1;height:4px;-webkit-appearance:none;background:var(--border2);border-radius:2px;outline:none;cursor:pointer;}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px rgba(0,229,255,.5);cursor:pointer;}
-.rv2{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent);min-width:28px;text-align:right;}
+.rrow{display:flex;align-items:center;gap:9px;}
+input[type=range]{flex:1;height:3px;-webkit-appearance:none;background:var(--b3);border-radius:2px;outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--cyan);box-shadow:0 0 7px rgba(0,238,255,.45);}
+.rval{font-family:var(--mono);font-size:10px;color:var(--cyan);min-width:18px;text-align:right;}
 
-/* PROCESS LOG */
-#log{background:#050810;border:1px solid var(--border);border-radius:3px;padding:10px 12px;height:200px;overflow-y:auto;font-family:'Share Tech Mono',monospace;font-size:10px;line-height:1.75;display:none;}
-#log.show{display:block;}
-.ll{display:block;}
-.ll.ok{color:var(--green);}
-.ll.info{color:var(--accent);}
-.ll.warn{color:var(--yellow);}
-.ll.err{color:var(--red);}
-.ll.dim{color:var(--text3);}
+/* ALERTS */
+.alert{border-radius:var(--r2);padding:9px 11px;font-family:var(--mono);font-size:8.5px;line-height:1.65;}
+.alert strong{display:block;font-size:9px;letter-spacing:1.3px;margin-bottom:3px;}
+.alert-a{background:var(--ad);border:1px solid rgba(255,184,0,.28);color:var(--amber);}
+.alert-c{background:var(--cd);border:1px solid rgba(0,238,255,.28);color:var(--cyan);}
+.alert-g{background:var(--gd);border:1px solid rgba(0,255,136,.28);color:var(--green);}
 
-/* PROGRESS */
-.prg-w{display:none;margin-top:12px;}
-.prg-w.show{display:block;}
-.prg-lbl{display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text2);margin-bottom:5px;letter-spacing:.5px;}
-.prg-bar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
-.prg-fill{height:100%;background:linear-gradient(90deg,var(--accent),#0077ff);width:0%;transition:width .35s;border-radius:3px;}
-
-/* STEPS */
-.steps-list{display:flex;flex-direction:column;gap:2px;margin-top:12px;}
-.si{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:3px;transition:all .2s;}
-.si.active{background:rgba(0,229,255,.05);}
-.sn{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:8px;flex-shrink:0;background:var(--border);color:var(--text3);border:1px solid var(--border2);transition:all .3s;}
-.si.active .sn{background:rgba(0,229,255,.15);border-color:var(--accent);color:var(--accent);box-shadow:0 0 8px rgba(0,229,255,.3);animation:spin 2s linear infinite;}
-.si.done .sn{background:rgba(57,255,110,.15);border-color:var(--green);color:var(--green);}
-@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-.st{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text3);transition:color .3s;letter-spacing:.3px;}
-.si.active .st{color:var(--text);}
-.si.done .st{color:var(--text2);}
-
-/* BUTTONS */
-.btn{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;padding:12px 20px;border-radius:3px;cursor:pointer;transition:all .2s;border:none;display:inline-flex;align-items:center;gap:7px;text-transform:uppercase;position:relative;overflow:hidden;white-space:nowrap;}
-.btn::after{content:'';position:absolute;inset:0;background:linear-gradient(rgba(255,255,255,.07),transparent);pointer-events:none;}
-.btn-go{background:linear-gradient(135deg,#0077ee,var(--accent));color:#000;width:100%;justify-content:center;font-size:11px;}
-.btn-go:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(0,229,255,.3);}
-.btn-go:active{transform:translateY(0);}
-.btn-go:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none;}
-.btn-sec{background:rgba(0,0,0,.4);border:1px solid var(--border2);color:var(--text2);font-size:9px;}
-.btn-sec:hover{border-color:var(--accent);color:var(--accent);}
-.btn-dl{background:linear-gradient(135deg,#0a2a0a,#122212);border:1px solid var(--green);color:var(--green);width:100%;justify-content:center;font-size:10px;box-shadow:0 0 16px rgba(57,255,110,.1);display:none;}
-.btn-dl.show{display:inline-flex;}
-.btn-dl:hover{box-shadow:0 0 28px rgba(57,255,110,.3);transform:translateY(-1px);}
-.brow{display:flex;gap:8px;margin-top:10px;}
-
-/* OUTPUT CARD */
-.out-card{background:rgba(57,255,110,.04);border:1px solid rgba(57,255,110,.2);border-radius:4px;padding:13px;margin-top:13px;display:none;}
-.out-card.show{display:block;animation:fadein .4s;}
-.out-title{font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;letter-spacing:2px;color:var(--green);margin-bottom:9px;display:flex;align-items:center;gap:7px;}
-.out-title::before{content:'▶';font-size:7px;}
-.out-meta{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:11px;}
-.om{font-family:'Share Tech Mono',monospace;font-size:9px;}
-.om span:first-child{color:var(--text3);display:block;letter-spacing:.5px;margin-bottom:2px;}
-.om span:last-child{color:var(--text);}
-
-/* SECTION TITLE */
-.st2{font-family:'Orbitron',monospace;font-size:8px;font-weight:700;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;}
-.st2::before{content:'//';color:var(--accent);font-size:11px;}
-
-/* DIVIDER */
-.div{height:1px;background:linear-gradient(90deg,transparent,var(--border2),transparent);margin:11px 0;}
-
-/* SIDEBAR */
-.sidebar{display:flex;flex-direction:column;gap:15px;}
-.info-b{background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:4px;padding:13px;}
-.ib-t{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--text2);margin-bottom:11px;text-transform:uppercase;}
-.stat-g{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
-.stat{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:3px;padding:9px 11px;}
-.sv{font-family:'Orbitron',sans-serif;font-size:17px;font-weight:900;color:var(--accent);line-height:1;margin-bottom:3px;}
-.sk{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;}
-.how-s{display:flex;flex-direction:column;gap:9px;}
-.hs{display:flex;gap:10px;align-items:flex-start;}
-.hn{width:20px;height:20px;flex-shrink:0;background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.3);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;color:var(--accent);}
-.htxt{font-size:12px;color:var(--text2);line-height:1.5;}
-.warn-b{background:rgba(255,214,10,.05);border:1px solid rgba(255,214,10,.2);border-radius:4px;padding:11px 13px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--yellow);line-height:1.65;letter-spacing:.3px;}
-.warn-b strong{display:block;font-size:10px;letter-spacing:1.5px;margin-bottom:5px;}
-.tool-item{display:flex;justify-content:space-between;align-items:center;padding:5px 7px;background:rgba(0,0,0,.3);border-radius:3px;margin-bottom:4px;}
-.ti-name{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text2);}
+/* SECTION */
+.sec{font-family:var(--mono);font-size:7.5px;font-weight:700;letter-spacing:2px;color:var(--t3);
+  text-transform:uppercase;margin-bottom:7px;padding-bottom:6px;border-bottom:1px solid var(--b);
+  display:flex;align-items:center;gap:5px;}
+.sec::before{content:'//';color:var(--cyan);font-size:9.5px;}
+.div{height:1px;background:linear-gradient(90deg,transparent,var(--b2),transparent);margin:10px 0;}
 
 /* BANNER PREVIEW */
-.bnr-prev{display:flex;align-items:center;gap:12px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:4px;padding:12px;}
-.bnr-icon{width:48px;height:48px;border:1px solid var(--border2);border-radius:3px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--text3);flex-shrink:0;}
+.bnr{display:flex;align-items:center;gap:11px;background:rgba(0,0,0,.28);border:1px solid var(--b);border-radius:var(--r);padding:11px;}
+.bnr-ico{width:48px;height:48px;flex-shrink:0;border:1px solid var(--b2);border-radius:var(--r2);
+  overflow:hidden;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:7px;color:var(--t3);}
+.bnr-ico img{width:100%;height:100%;object-fit:cover;}
+.bnr-t{font-family:var(--head);font-size:12px;font-weight:800;color:var(--text);margin-bottom:2px;}
+.bnr-p{font-family:var(--mono);font-size:8.5px;color:var(--t2);}
 
-/* WARN BOX */
-.inj-warn{background:rgba(255,107,53,.06);border:1px solid rgba(255,107,53,.25);border-radius:3px;padding:10px 12px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--accent2);line-height:1.6;letter-spacing:.3px;}
-.inj-warn strong{display:block;letter-spacing:1.5px;margin-bottom:4px;}
+/* PROGRESS */
+.prg{display:none;margin-top:11px;}.prg.on{display:block;}
+.prg-h{display:flex;justify-content:space-between;font-family:var(--mono);font-size:8.5px;color:var(--t2);margin-bottom:4px;}
+.prg-tr{height:4px;background:var(--b2);border-radius:2px;overflow:hidden;}
+.prg-fill{height:100%;background:linear-gradient(90deg,var(--cyan),#2255ff);width:0%;transition:width .3s;border-radius:2px;position:relative;}
+.prg-fill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:18px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.35));
+  animation:shim 1s ease infinite;}
+@keyframes shim{0%,100%{opacity:0;}50%{opacity:1;}}
 
-/* FOOTER */
-footer{position:relative;z-index:10;text-align:center;padding:20px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:1px;border-top:1px solid var(--border);}
-footer a{color:var(--text3);text-decoration:none;}
-footer a:hover{color:var(--accent);}
+/* LOG */
+#log{display:none;margin-top:9px;background:rgba(0,0,0,.55);border:1px solid var(--b);
+  border-radius:var(--r2);padding:9px 11px;height:175px;overflow-y:auto;
+  font-family:var(--mono);font-size:9px;line-height:1.85;}
+#log.on{display:block;}
+.ll{display:block;}.ll.info{color:var(--cyan);}.ll.ok{color:var(--green);}
+.ll.warn{color:var(--amber);}.ll.err{color:var(--red);}.ll.dim{color:var(--t3);}
 
-::-webkit-scrollbar{width:4px;height:4px;}
-::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+/* STEPS */
+.steps{display:none;flex-direction:column;gap:2px;margin-top:10px;}
+.steps.on{display:flex;}
+.si{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:var(--r2);transition:background var(--fast);}
+.si.active{background:rgba(0,238,255,.05);}
+.sn{width:17px;height:17px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;
+  justify-content:center;font-family:var(--mono);font-size:7.5px;background:var(--b2);
+  color:var(--t3);border:1px solid var(--b3);transition:all .3s;}
+.si.active .sn{background:rgba(0,238,255,.14);border-color:var(--cyan);color:var(--cyan);
+  box-shadow:0 0 9px rgba(0,238,255,.28);animation:spin 2s linear infinite;}
+.si.done .sn{background:rgba(0,255,136,.14);border-color:var(--green);color:var(--green);}
+@keyframes spin{to{transform:rotate(360deg);}}
+.stxt{font-family:var(--mono);font-size:8.5px;color:var(--t3);transition:color .3s;}
+.si.active .stxt{color:var(--text);}.si.done .stxt{color:var(--t2);}
 
-/* CIA BASE UPLOAD */
-.cia-dz-mini{border:1px dashed var(--border2);border-radius:3px;padding:14px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:rgba(0,0,0,.2);}
-.cia-dz-mini:hover,.cia-dz-mini.ready{border-color:var(--accent);background:rgba(0,229,255,.03);}
-.cia-dz-mini.ready{border-color:var(--green);}
-.cia-dz-mini input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+/* OUT CARD */
+.out{display:none;margin-top:11px;background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.2);border-radius:var(--r);padding:12px;}
+.out.on{display:block;animation:fadeup .3s ease;}
+.out-t{font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:2px;color:var(--green);margin-bottom:9px;display:flex;align-items:center;gap:6px;}
+.out-t::before{content:'▶';font-size:6px;}
+.out-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
+.om{font-family:var(--mono);font-size:8.5px;}
+.omk{color:var(--t3);display:block;letter-spacing:.3px;margin-bottom:1px;}
+.omv{color:var(--text);}
 
-/* MOBILE PADDING */
-@media(max-width:400px){.btn{font-size:9px;padding:10px 14px;}.ph{font-size:8px;}}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:var(--mono);
+  font-size:9px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;padding:10px 18px;
+  border-radius:var(--r2);cursor:pointer;border:none;transition:all var(--fast);
+  position:relative;overflow:hidden;white-space:nowrap;}
+.btn::after{content:'';position:absolute;inset:0;background:linear-gradient(rgba(255,255,255,.07),transparent);pointer-events:none;}
+.btn-go{background:linear-gradient(135deg,#0044dd,var(--cyan));color:#000;width:100%;font-size:10px;}
+.btn-go:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 18px rgba(0,238,255,.28);}
+.btn-go:disabled{opacity:.3;cursor:not-allowed;}
+.btn-gh{background:rgba(0,0,0,.38);border:1px solid var(--b2);color:var(--t2);font-size:8.5px;}
+.btn-gh:hover{border-color:var(--cyan);color:var(--cyan);}
+.btn-dl{display:none;width:100%;background:linear-gradient(135deg,#001f0e,#002f16);
+  border:1px solid rgba(0,255,136,.38);color:var(--green);font-size:9px;box-shadow:0 0 14px rgba(0,255,136,.07);}
+.btn-dl.on{display:inline-flex;}
+.btn-dl:hover{box-shadow:0 0 26px rgba(0,255,136,.26);transform:translateY(-1px);}
+.brow{display:flex;gap:7px;margin-top:9px;}
+
+/* VC BASE BOX */
+.vc-cached{display:none;align-items:center;gap:10px;padding:9px 11px;background:var(--gd);
+  border:1px solid rgba(0,255,136,.25);border-radius:var(--r2);margin-bottom:10px;}
+.vc-cached.on{display:flex;}
+.vc-ico{width:28px;height:28px;border-radius:var(--r2);background:rgba(0,255,136,.15);
+  border:1px solid rgba(0,255,136,.3);display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;font-size:14px;}
+.vc-info{font-family:var(--mono);font-size:8.5px;line-height:1.65;color:var(--green);}
+.vc-info strong{font-size:9.5px;}
+
+/* DZ MINI */
+.dz-mini{border:1px dashed var(--b3);border-radius:var(--r);padding:15px 13px;text-align:center;
+  cursor:pointer;position:relative;background:rgba(0,0,0,.18);transition:all var(--med);}
+.dz-mini:hover,.dz-mini.over{border-color:var(--cyan);background:var(--cd);}
+.dz-mini.ok{border-color:var(--green);background:var(--gd);border-style:solid;}
+.dz-mini input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.dz-mini-t{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--t2);margin-bottom:2px;}
+.dz-mini-s{font-family:var(--mono);font-size:8px;color:var(--t3);}
+
+/* SIDEBAR */
+.sidebar{display:flex;flex-direction:column;gap:12px;}
+.card{background:rgba(0,0,0,.28);border:1px solid var(--b);border-radius:var(--r);padding:12px;}
+.ct{font-family:var(--mono);font-size:7.5px;letter-spacing:2px;color:var(--t2);margin-bottom:10px;text-transform:uppercase;}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.stat{background:rgba(0,0,0,.33);border:1px solid var(--b);border-radius:var(--r2);padding:8px 10px;}
+.sv{font-family:var(--head);font-size:17px;font-weight:800;color:var(--cyan);line-height:1;margin-bottom:2px;}
+.sk{font-family:var(--mono);font-size:7px;color:var(--t3);letter-spacing:.5px;text-transform:uppercase;}
+.hs{display:flex;flex-direction:column;gap:7px;}
+.hst{display:flex;gap:8px;align-items:flex-start;}
+.hn{width:19px;height:19px;flex-shrink:0;background:rgba(0,238,255,.07);border:1px solid rgba(0,238,255,.22);
+  border-radius:2px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--head);font-size:8.5px;font-weight:800;color:var(--cyan);}
+.htx{font-size:11.5px;color:var(--t2);line-height:1.55;}
+.tr{display:flex;justify-content:space-between;align-items:center;padding:5px 6px;
+  background:rgba(0,0,0,.28);border-radius:var(--r2);margin-bottom:3px;}
+.tn{font-family:var(--mono);font-size:9px;color:var(--t2);}
+.lnk{font-family:var(--mono);font-size:8.5px;color:var(--cyan);text-decoration:none;padding:5px 6px;
+  background:rgba(0,0,0,.28);border-radius:var(--r2);display:block;transition:background var(--fast);}
+.lnk:hover{background:rgba(0,238,255,.07);}
+.lnk::before{content:'→ ';}
+
+/* TOAST */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(70px);
+  z-index:10000;padding:9px 18px;background:var(--surf);border:1px solid var(--b2);
+  border-radius:var(--r);font-family:var(--mono);font-size:9px;color:var(--text);
+  box-shadow:0 8px 30px rgba(0,0,0,.6);transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .3s;
+  opacity:0;white-space:nowrap;}
+#toast.on{transform:translateX(-50%) translateY(0);opacity:1;}
+#toast.ok{border-color:rgba(0,255,136,.4);color:var(--green);}
+#toast.err{border-color:rgba(255,51,85,.4);color:var(--red);}
+
+::-webkit-scrollbar{width:4px;height:4px;}::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--b3);border-radius:2px;}
+footer{position:relative;z-index:10;text-align:center;padding:18px 14px;font-family:var(--mono);
+  font-size:8px;color:var(--t3);letter-spacing:.8px;border-top:1px solid var(--b);}
+footer a{color:var(--t3);text-decoration:none;}footer a:hover{color:var(--cyan);}
+@media(max-width:380px){.btn{font-size:8px;padding:9px 12px;}.logo-title{font-size:12px;}.badge{display:none;}}
+details summary{list-style:none;}.details summary::-webkit-details-marker{display:none;}
 </style>
 </head>
 <body>
+<div class="gbg"></div>
+<div id="toast"></div>
 
 <header>
-  <div class="logo">
-    <div class="logo-hex">GBA</div>
-    <div>
-      <div class="logo-text">NSUI WEB</div>
-      <div class="logo-sub">NEW SUPER ULTIMATE INJECTOR</div>
+  <a class="logo" href="#">
+    <div class="logo-hex"><span>GBA</span></div>
+    <div><div class="logo-title">NSUI WEB</div><div class="logo-sub">NEW SUPER ULTIMATE INJECTOR</div></div>
+  </a>
+  <div class="hright">
+    <div class="hprog" id="hprog">
+      <div class="hpt"><div class="hpb" id="hpb"></div></div>
+      <div class="hpc" id="hpc">0%</div>
     </div>
-  </div>
-  <div class="hbadges">
-    <span class="hb hb-c">GBA→CIA</span>
-    <span class="hb hb-g">3DS VC</span>
-    <span class="hb hb-o">CFW</span>
-    <span class="online">READY</span>
+    <span class="badge bc">GBA→CIA</span>
+    <span class="badge bg">3DS VC</span>
+    <span class="badge ba">CFW</span>
+    <div class="dot">PRONTO</div>
   </div>
 </header>
 
-<div class="wrap">
+<div class="app">
+<div class="main">
 
-<!-- ══════════════ MAIN COLUMN ══════════════ -->
-<div class="main-col">
-
-<!-- STEP 1: ROM -->
-<div class="panel lit" id="p1">
-  <div class="ph"><div class="ph-n">01</div>CARICA ROM GBA</div>
+<!-- 01 ROM -->
+<div class="panel lit" id="panelRom">
+  <div class="ph">
+    <div class="phn">01</div>CARICA ROM GBA
+    <span class="phend" id="romBadge"></span>
+  </div>
   <div class="pb">
-    <div class="dz" id="dz-rom">
+    <div class="dz" id="dzRom">
       <input type="file" id="romFile" accept=".gba,.agb,.bin">
-      <div class="dz-ico">
-        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-          <rect x=".5" y=".5" width="43" height="43" rx="3" stroke="#1a2030" stroke-width="1"/>
-          <rect x="6" y="6" width="16" height="11" rx="1" fill="rgba(0,229,255,.08)" stroke="rgba(0,229,255,.25)" stroke-width="1"/>
-          <text x="7" y="14.5" font-family="monospace" font-size="5.5" fill="#00e5ff">.GBA</text>
-          <path d="M22 32V20M22 20L15 27M22 20L29 27" stroke="#00e5ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M12 36H32" stroke="#1a2030" stroke-width="1.5" stroke-linecap="round"/>
+      <div class="dz-icon">
+        <svg viewBox="0 0 38 38" fill="none">
+          <rect x="1" y="1" width="36" height="36" rx="3" stroke="rgba(255,255,255,.07)" stroke-width="1"/>
+          <rect x="4" y="4" width="13" height="9" rx="1" fill="rgba(0,238,255,.07)" stroke="rgba(0,238,255,.28)" stroke-width="1"/>
+          <text x="4.5" y="11.5" font-family="monospace" font-size="5" fill="#00eeff">.GBA</text>
+          <path d="M19 30V17M19 17L13 23M19 17L25 23" stroke="#00eeff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
-      <div class="dz-t" id="romDzTitle">TRASCINA IL ROM GBA QUI</div>
-      <div class="dz-s">oppure clicca per selezionare il file</div>
+      <div class="dz-t" id="romLabel">TRASCINA IL ROM GBA QUI</div>
+      <div class="dz-s">config CIA compilata automaticamente</div>
       <div class="dz-fmts"><span class="fmt">.GBA</span><span class="fmt">.AGB</span><span class="fmt">.BIN</span></div>
     </div>
-    <div id="romInfo"></div>
+    <div class="itbl" id="romTbl"></div>
   </div>
 </div>
 
-<!-- STEP 2: VC BASE -->
-<div class="panel" id="p2">
-  <div class="ph"><div class="ph-n">02</div>CARICA VC BASE CIA</div>
-  <div class="pb">
-    <div class="inj-warn" style="margin-bottom:12px;">
-      <strong>⚠ REQUISITO LEGALE</strong>
-      Devi fornire un VC Base CIA estratto legalmente dal tuo 3DS con GodMode9 o FBI.
-      Il VC Base contiene l'emulatore GBA di Nintendo necessario per far girare la ROM.
+<!-- 02 VC BASE (auto-caricato dalla repo) -->
+<div class="panel" id="panelVc">
+  <div class="ph">
+    <div class="phn">02</div>VC BASE CIA
+    <span class="phend" id="vcBadge"></span>
+  </div>
+  <div class="pb" style="padding:10px 13px;">
+    <div id="vcStatusBox" style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(0,0,0,.3);border:1px solid var(--b2);border-radius:var(--r2);">
+      <div id="vcSpinner" style="width:20px;height:20px;flex-shrink:0;border:2px solid rgba(0,238,255,.2);border-top-color:var(--cyan);border-radius:50%;animation:spin 1s linear infinite;"></div>
+      <div>
+        <div style="font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--t2);" id="vcStatusTitle">Download VC Base...</div>
+        <div style="font-family:var(--mono);font-size:8px;color:var(--t3);margin-top:1px;" id="vcStatusSub">Recupero conv.cia dalla repository...</div>
+      </div>
     </div>
-    <div class="cia-dz-mini" id="dz-cia">
-      <input type="file" id="ciaFile" accept=".cia,.3ds">
-      <div style="font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--text2);margin-bottom:5px;" id="ciaDzTitle">📂 CARICA VC BASE CIA</div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);">Formato: .CIA · Esempio: F-Zero Climax, Zelda MCDX, Metroid Fusion...</div>
-    </div>
-    <div id="ciaInfo" style="display:none;margin-top:10px;"></div>
+    <div class="itbl" id="ciaTbl" style="margin-top:9px;"></div>
   </div>
 </div>
 
-<!-- STEP 3: CONFIG -->
-<div class="panel" id="p3">
-  <div class="ph"><div class="ph-n">03</div>CONFIGURAZIONE CIA</div>
-  <div class="step-row">
-    <button class="step-pill on" data-t="gen">Generale</button>
-    <button class="step-pill" data-t="bnr">Banner</button>
-    <button class="step-pill" data-t="opt">Opzioni</button>
-    <button class="step-pill" data-t="adv">Avanzate</button>
+<!-- 03 CONFIG -->
+<div class="panel" id="panelCfg">
+  <div class="ph">
+    <div class="phn">03</div>CONFIGURAZIONE
+    <span style="margin-left:6px;font-size:7px;padding:1px 5px;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.25);border-radius:2px;color:var(--green);">AUTO</span>
+  </div>
+  <div class="tabs">
+    <button class="tab on" data-t="gen">Generale</button>
+    <button class="tab" data-t="bnr">Banner</button>
+    <button class="tab" data-t="opt">Opzioni</button>
+    <button class="tab" data-t="adv">Avanzate</button>
   </div>
 
-  <!-- GENERAL -->
-  <div class="tab-c on" id="t-gen">
+  <div class="tp on" id="t-gen">
     <div class="row2">
-      <div class="fg"><label class="req">Titolo Gioco</label><input type="text" id="gameTitle" placeholder="Es: Pokémon FireRed" maxlength="128"></div>
-      <div class="fg"><label>Publisher</label><input type="text" id="gamePublisher" placeholder="Es: Nintendo" maxlength="64"></div>
+      <div class="fld"><div class="lbl">Titolo <span class="req">*</span><span class="auto-pill">AUTO</span></div>
+        <input type="text" id="gameTitle" placeholder="Es: Pokémon FireRed" maxlength="128"></div>
+      <div class="fld"><div class="lbl">Publisher <span class="auto-pill">AUTO</span></div>
+        <input type="text" id="gamePublisher" placeholder="Es: Nintendo" maxlength="64"></div>
     </div>
     <div class="row2">
-      <div class="fg">
-        <label>Regione</label>
+      <div class="fld"><div class="lbl">Regione <span class="auto-pill">AUTO</span></div>
         <select id="gameRegion">
-          <option value="EUR">EUR — Europa</option>
-          <option value="USA">USA — America</option>
-          <option value="JPN">JPN — Giappone</option>
-          <option value="KOR">KOR — Corea</option>
-        </select>
-      </div>
-      <div class="fg">
-        <label>Lingua</label>
+          <option value="EUR">EUR — Europa</option><option value="USA">USA — America</option>
+          <option value="JPN">JPN — Giappone</option><option value="KOR">KOR — Corea</option>
+        </select></div>
+      <div class="fld"><div class="lbl">Lingua <span class="auto-pill">AUTO</span></div>
         <select id="gameLang">
-          <option value="it">Italiano</option>
-          <option value="en">English</option>
-          <option value="fr">Français</option>
-          <option value="de">Deutsch</option>
-          <option value="es">Español</option>
-          <option value="ja">日本語</option>
-        </select>
-      </div>
+          <option value="it">🇮🇹 Italiano</option><option value="en">🇬🇧 English</option>
+          <option value="fr">🇫🇷 Français</option><option value="de">🇩🇪 Deutsch</option>
+          <option value="es">🇪🇸 Español</option><option value="ja">🇯🇵 日本語</option>
+          <option value="ko">🇰🇷 한국어</option>
+        </select></div>
     </div>
-    <div class="fg"><label>Descrizione Home Menu</label><textarea id="gameDesc" rows="2" placeholder="Breve descrizione..." style="font-family:Rajdhani,sans-serif;resize:vertical;"></textarea></div>
+    <div class="fld"><div class="lbl">Descrizione</div>
+      <textarea id="gameDesc" placeholder="Breve descrizione..."></textarea></div>
   </div>
 
-  <!-- BANNER -->
-  <div class="tab-c" id="t-bnr">
-    <div class="st2">ICONA (48×48 px)</div>
-    <div class="icon-row" style="margin-bottom:13px;">
+  <div class="tp" id="t-bnr">
+    <div class="sec">ICONA (48×48)</div>
+    <div class="icon-row" style="margin-bottom:12px;">
       <div class="icon-prev" id="iconPrev">NO<br>IMG</div>
       <div style="flex:1;">
-        <div style="display:flex;gap:7px;margin-bottom:7px;flex-wrap:wrap;">
-          <label class="ibtn">📁 Carica PNG<input type="file" accept=".png,.bmp,.jpg" id="iconFile"></label>
-          <button class="ibtn" id="autoIcon">⚡ Auto-genera</button>
+        <div style="display:flex;gap:6px;margin-bottom:5px;flex-wrap:wrap;">
+          <label class="ibtn">📁 Carica PNG<input type="file" accept=".png,.bmp,.jpg,.jpeg" id="iconFile"></label>
+          <button class="ibtn" id="autoIconBtn">⚡ Rigenera</button>
         </div>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);">PNG/BMP 48×48 px · Se non fornita, ne verrà generata una automatica</div>
+        <div style="font-family:var(--mono);font-size:7.5px;color:var(--t3);line-height:1.6;">
+          PNG/BMP 48×48px<br>Auto-generata dalla ROM</div>
       </div>
     </div>
-    <div class="st2">COLORE SFONDO BANNER</div>
-    <div class="cgrid" id="cg">
-      <div class="csw sel" style="background:#0d1b2a" data-c="#0d1b2a"></div>
+    <div class="sec">COLORE SFONDO</div>
+    <div class="cgrid" id="cgrid">
+      <div class="csw on" style="background:#0a1428" data-c="#0a1428"></div>
       <div class="csw" style="background:#1a1a2e" data-c="#1a1a2e"></div>
       <div class="csw" style="background:#0f3460" data-c="#0f3460"></div>
-      <div class="csw" style="background:#533483" data-c="#533483"></div>
-      <div class="csw" style="background:#7b0049" data-c="#7b0049"></div>
       <div class="csw" style="background:#1b4332" data-c="#1b4332"></div>
-      <div class="csw" style="background:#7b2d00" data-c="#7b2d00"></div>
-      <div class="csw" style="background:#2d2400" data-c="#2d2400"></div>
-      <div class="csw" style="background:#000000" data-c="#000000"></div>
-      <div class="csw" style="background:#1a2030" data-c="#1a2030"></div>
+      <div class="csw" style="background:#3d1a00" data-c="#3d1a00"></div>
+      <div class="csw" style="background:#2a003d" data-c="#2a003d"></div>
+      <div class="csw" style="background:#001a1a" data-c="#001a1a"></div>
+      <div class="csw" style="background:#0a0a0a" data-c="#0a0a0a"></div>
+      <div class="csw" style="background:#162040" data-c="#162040"></div>
+      <div class="csw" style="background:#1a0820" data-c="#1a0820"></div>
     </div>
     <div class="div"></div>
-    <div class="st2">ANTEPRIMA BANNER</div>
-    <div class="bnr-prev">
-      <div class="bnr-icon" id="bnrIcon">ICON</div>
-      <div>
-        <div id="bnrTitle" style="font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">Nome Gioco</div>
-        <div id="bnrDesc" style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text2);">Publisher</div>
-      </div>
+    <div class="sec">ANTEPRIMA</div>
+    <div class="bnr">
+      <div class="bnr-ico" id="bnrIco">ICON</div>
+      <div><div class="bnr-t" id="bnrT">Nome Gioco</div><div class="bnr-p" id="bnrP">Publisher</div></div>
     </div>
   </div>
 
-  <!-- OPTIONS -->
-  <div class="tab-c" id="t-opt">
-    <div class="st2">EMULAZIONE</div>
-    <div class="tog-r"><div><div class="tog-lb">Save States</div><div class="tog-desc">Salvataggio rapido VC</div></div><label class="tog"><input type="checkbox" id="optSave" checked><span class="tog-sl"></span></label></div>
-    <div class="tog-r"><div><div class="tog-lb">Sleep Mode</div><div class="tog-desc">Compatibilità sleep 3DS</div></div><label class="tog"><input type="checkbox" id="optSleep" checked><span class="tog-sl"></span></label></div>
-    <div class="tog-r"><div><div class="tog-lb">Button Remapping</div><div class="tog-desc">Rimappa tasti GBA→3DS</div></div><label class="tog"><input type="checkbox" id="optBtns"><span class="tog-sl"></span></label></div>
-    <div class="tog-r"><div><div class="tog-lb">Gyro Support</div><div class="tog-desc">Sensore giroscopio N3DS</div></div><label class="tog"><input type="checkbox" id="optGyro"><span class="tog-sl"></span></label></div>
+  <div class="tp" id="t-opt">
+    <div class="sec">EMULAZIONE VC</div>
+    <div class="tog-r"><div><div class="tl">Save States</div><div class="tld">Salvataggio rapido VC</div></div>
+      <label class="tog"><input type="checkbox" id="optSave" checked><div class="tog-tr"></div><div class="tog-th"></div></label></div>
+    <div class="tog-r"><div><div class="tl">Sleep Mode</div><div class="tld">Compatibilità sleep N3DS</div></div>
+      <label class="tog"><input type="checkbox" id="optSleep" checked><div class="tog-tr"></div><div class="tog-th"></div></label></div>
+    <div class="tog-r"><div><div class="tl">Button Remapping</div><div class="tld">Rimappa tasti GBA → N3DS</div></div>
+      <label class="tog"><input type="checkbox" id="optBtns"><div class="tog-tr"></div><div class="tog-th"></div></label></div>
+    <div class="tog-r"><div><div class="tl">Gyroscope</div><div class="tld">Sensore N3DS</div></div>
+      <label class="tog"><input type="checkbox" id="optGyro"><div class="tog-tr"></div><div class="tog-th"></div></label></div>
     <div class="div"></div>
-    <div class="st2">DISPLAY</div>
-    <div class="fg"><label>Scala Schermo</label><select id="optScale"><option value="native">Native (240×160)</option><option value="stretch" selected>Stretch (320×240)</option><option value="aspect">Aspect Ratio 3:2</option></select></div>
-    <div class="fg"><label>Luminosità</label><div class="rw"><input type="range" min="1" max="5" value="3" id="optBright" oninput="document.getElementById('bv').textContent=this.value"><span class="rv2" id="bv">3</span></div></div>
+    <div class="sec">DISPLAY</div>
+    <div class="fld"><div class="lbl">Scala</div>
+      <select id="optScale"><option value="native">Native (240x160)</option>
+        <option value="stretch" selected>Stretch (320x240)</option>
+        <option value="aspect">Aspect 3:2</option></select></div>
+    <div class="fld"><div class="lbl">Luminosita</div>
+      <div class="rrow"><input type="range" min="1" max="5" value="3" id="optBright"
+        oninput="document.getElementById('bval').textContent=this.value">
+        <span class="rval" id="bval">3</span></div></div>
   </div>
 
-  <!-- ADVANCED -->
-  <div class="tab-c" id="t-adv">
-    <div class="st2">IDENTIFICATORI CIA</div>
+  <div class="tp" id="t-adv">
+    <div class="sec">IDENTIFICATORI <span style="font-size:7.5px;color:var(--green);margin-left:4px;">compilati auto</span></div>
     <div class="row2">
-      <div class="fg"><label>Title ID (HEX)</label><input type="text" id="titleId" placeholder="00040000XXXXXXXX" maxlength="16" style="font-family:'Share Tech Mono',monospace;font-size:11px;"></div>
-      <div class="fg"><label>Product Code</label><input type="text" id="productCode" placeholder="CTR-P-AXVE" maxlength="16" style="font-family:'Share Tech Mono',monospace;font-size:11px;"></div>
+      <div class="fld"><div class="lbl">Title ID <span class="auto-pill">AUTO</span></div>
+        <input type="text" id="titleId" maxlength="16" style="font-family:var(--mono);font-size:10px;"></div>
+      <div class="fld"><div class="lbl">Product Code <span class="auto-pill">AUTO</span></div>
+        <input type="text" id="productCode" maxlength="16" style="font-family:var(--mono);font-size:10px;"></div>
     </div>
     <div class="row2">
-      <div class="fg"><label>CIA Version</label><input type="number" id="ciaVer" value="0" min="0" max="65535"></div>
-      <div class="fg"><label>Maker Code</label><input type="text" id="makerCode" placeholder="01" maxlength="4" style="font-family:'Share Tech Mono',monospace;font-size:11px;"></div>
+      <div class="fld"><div class="lbl">CIA Version</div>
+        <input type="number" id="ciaVer" value="0" min="0" max="65535"></div>
+      <div class="fld"><div class="lbl">Maker Code <span class="auto-pill">AUTO</span></div>
+        <input type="text" id="makerCode" maxlength="4" style="font-family:var(--mono);font-size:10px;"></div>
     </div>
     <div class="div"></div>
-    <div class="warn-b">
-      <strong>⚠ SIGPATCHES RICHIESTE</strong>
-      Il CIA generato usa firma dummy. Installa Luma3DS con sigpatches abilitate.
-      Usa <strong>FBI Manager</strong> o <strong>GodMode9</strong> per l'installazione sul 3DS.
+    <div class="alert alert-a">
+      <strong>SIGPATCHES RICHIESTE</strong>
+      CIA usa firma dummy. Luma3DS con sigpatches obbligatorio.
+      Installa con <strong>FBI</strong> o <strong>GodMode9</strong>.
     </div>
   </div>
 </div>
 
-<!-- STEP 4: CONVERT -->
-<div class="panel" id="p4">
-  <div class="ph"><div class="ph-n">04</div>CONVERSIONE & OUTPUT</div>
+<!-- 04 CONVERSIONE -->
+<div class="panel" id="panelConv">
+  <div class="ph"><div class="phn">04</div>CONVERSIONE &amp; OUTPUT</div>
   <div class="pb">
     <button class="btn btn-go" id="convertBtn" disabled>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       AVVIA INIEZIONE CIA
     </button>
-    <div class="prg-w" id="pgw">
-      <div style="height:10px;"></div>
-      <div class="prg-lbl"><span id="pgTxt">Inizializzazione...</span><span id="pgPct">0%</span></div>
-      <div class="prg-bar"><div class="prg-fill" id="pgFill"></div></div>
+    <div class="prg" id="prgW">
+      <div class="prg-h"><span id="prgL">Inizializzazione...</span><span id="prgP">0%</span></div>
+      <div class="prg-tr"><div class="prg-fill" id="prgB"></div></div>
     </div>
     <div id="log"></div>
-    <div class="steps-list" id="stepsList" style="display:none;">
-      <div class="si" id="s0"><div class="sn">1</div><div class="st">Validazione ROM GBA</div></div>
-      <div class="si" id="s1"><div class="sn">2</div><div class="st">Parsing CIA Base (Header/TMD/NCCH)</div></div>
-      <div class="si" id="s2"><div class="sn">3</div><div class="st">Localizzazione ROM nel RomFS/Content</div></div>
-      <div class="si" id="s3"><div class="sn">4</div><div class="st">Iniezione payload ROM</div></div>
-      <div class="si" id="s4"><div class="sn">5</div><div class="st">Aggiornamento dimensioni NCCH</div></div>
-      <div class="si" id="s5"><div class="sn">6</div><div class="st">Ricalcolo hash SHA-256 TMD</div></div>
-      <div class="si" id="s6"><div class="sn">7</div><div class="st">Assemblaggio CIA finale</div></div>
+    <div class="steps" id="stepsEl">
+      <div class="si" id="s0"><div class="sn">1</div><div class="stxt">Validazione ROM GBA</div></div>
+      <div class="si" id="s1"><div class="sn">2</div><div class="stxt">Parsing CIA Base (Header/TMD/NCCH)</div></div>
+      <div class="si" id="s2"><div class="sn">3</div><div class="stxt">Localizzazione ROM nel CIA</div></div>
+      <div class="si" id="s3"><div class="sn">4</div><div class="stxt">Iniezione payload ROM</div></div>
+      <div class="si" id="s4"><div class="sn">5</div><div class="stxt">Aggiornamento NCCH headers</div></div>
+      <div class="si" id="s5"><div class="sn">6</div><div class="stxt">Ricalcolo SHA-256 TMD</div></div>
+      <div class="si" id="s6"><div class="sn">7</div><div class="stxt">Assemblaggio CIA finale</div></div>
     </div>
-    <div class="out-card" id="outCard">
-      <div class="out-title">CIA INIETTATO CON SUCCESSO</div>
+    <div class="out" id="outCard">
+      <div class="out-t">CIA PRONTO</div>
       <div class="out-meta">
-        <div class="om"><span>FILENAME</span><span id="outName">—</span></div>
-        <div class="om"><span>SIZE</span><span id="outSize">—</span></div>
-        <div class="om"><span>SHA-256 (16)</span><span id="outHash" style="font-family:'Share Tech Mono',monospace;font-size:9px;">—</span></div>
-        <div class="om"><span>FORMAT</span><span>Nintendo CIA v2</span></div>
+        <div class="om"><span class="omk">FILENAME</span><span class="omv" id="outName">-</span></div>
+        <div class="om"><span class="omk">SIZE</span><span class="omv" id="outSize">-</span></div>
+        <div class="om"><span class="omk">SHA-256</span><span class="omv" id="outHash" style="font-family:var(--mono);font-size:8px;">-</span></div>
+        <div class="om"><span class="omk">FORMAT</span><span class="omv">Nintendo CIA v2</span></div>
       </div>
-      <button class="btn btn-dl show" id="dlBtn">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <button class="btn btn-dl" id="dlBtn">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         SCARICA .CIA
       </button>
     </div>
     <div class="brow">
-      <button class="btn btn-sec" id="resetBtn">↺ RESET</button>
+      <button class="btn btn-gh" id="resetBtn">RESET ROM</button>
     </div>
   </div>
 </div>
 
-</div><!-- /main-col -->
+</div><!-- /main -->
 
-<!-- ══════════════ SIDEBAR ══════════════ -->
 <div class="sidebar">
-  <div class="panel" style="padding:14px;">
-    <div class="ph" style="margin:-14px -14px 12px;padding:10px 14px;"><div class="ph-n">##</div>STATISTICHE ROM</div>
-    <div class="stat-g">
-      <div class="stat"><div class="sv" id="sSize">—</div><div class="sk">ROM SIZE</div></div>
-      <div class="stat"><div class="sv" id="sCode">—</div><div class="sk">GAME CODE</div></div>
-      <div class="stat"><div class="sv" id="sChk">—</div><div class="sk">CHECKSUM</div></div>
-      <div class="stat"><div class="sv" id="sReg">—</div><div class="sk">REGION</div></div>
+  <div class="panel" style="padding:12px;">
+    <div class="ph" style="margin:-12px -12px 11px;padding:8px 12px;">
+      <div class="phn">x</div>STATS ROM</div>
+    <div class="sg">
+      <div class="stat"><div class="sv" id="stSize">-</div><div class="sk">SIZE</div></div>
+      <div class="stat"><div class="sv" id="stCode">-</div><div class="sk">CODE</div></div>
+      <div class="stat"><div class="sv" id="stChk">-</div><div class="sk">CHECKSUM</div></div>
+      <div class="stat"><div class="sv" id="stReg">-</div><div class="sk">REGION</div></div>
     </div>
   </div>
-
-  <div class="info-b">
-    <div class="ib-t">// COME USARLO</div>
-    <div class="how-s">
-      <div class="hs"><div class="hn">1</div><div class="htxt">Carica il tuo <strong>.GBA</strong> con drag & drop</div></div>
-      <div class="hs"><div class="hn">2</div><div class="htxt">Carica il VC Base <strong>.CIA</strong> estratto dal tuo 3DS</div></div>
-      <div class="hs"><div class="hn">3</div><div class="htxt">Configura titolo, icona e opzioni</div></div>
-      <div class="hs"><div class="hn">4</div><div class="htxt">Clicca <strong>Avvia Iniezione</strong> e scarica</div></div>
-      <div class="hs"><div class="hn">5</div><div class="htxt">Installa con <strong>FBI</strong> o <strong>GodMode9</strong> su N3DS CFW</div></div>
+  <div class="card">
+    <div class="ct">// COME SI USA</div>
+    <div class="hs">
+      <div class="hst"><div class="hn">1</div><div class="htx">Carica la ROM <strong>.GBA</strong> — tutto si compila da solo</div></div>
+      <div class="hst"><div class="hn">2</div><div class="htx"><strong>VC Base scaricato automaticamente</strong> dalla repo</div></div>
+      <div class="hst"><div class="hn">3</div><div class="htx">Controlla/modifica la config</div></div>
+      <div class="hst"><div class="hn">4</div><div class="htx">Avvia iniezione e scarica il CIA</div></div>
+      <div class="hst"><div class="hn">5</div><div class="htx">Installa con <strong>FBI</strong> o <strong>GodMode9</strong> su N3DS CFW</div></div>
     </div>
   </div>
-
-  <div class="warn-b">
-    <strong>⚠ REQUISITI 3DS</strong>
-    · New Nintendo 3DS (N3DS)<br>
-    · CFW Luma3DS con sigpatches<br>
-    · FBI Manager o GodMode9<br>
-    · VC Base CIA estratto legalmente
+  <div class="alert alert-a" style="margin:0;">
+    <strong>REQUISITI 3DS</strong>
+    New Nintendo 3DS<br>
+    CFW Luma3DS + sigpatches<br>
+    FBI Manager o GodMode9<br>
+    VC Base estratto da eShop/GodMode9
   </div>
-
-  <div class="info-b">
-    <div class="ib-t">// STRUMENTI</div>
-    <div class="tool-item"><span class="ti-name">CIA Parser</span><span class="hb hb-g">JS inline</span></div>
-    <div class="tool-item"><span class="ti-name">SHA-256</span><span class="hb hb-g">WebCrypto</span></div>
-    <div class="tool-item"><span class="ti-name">ROM Injector</span><span class="hb hb-g">JS inline</span></div>
-    <div class="tool-item"><span class="ti-name">VC Base CIA</span><span class="hb hb-o">tuo 3DS</span></div>
-    <div class="tool-item"><span class="ti-name">Sigpatches</span><span class="hb hb-o">Luma3DS</span></div>
+  <div class="card">
+    <div class="ct">// TECH</div>
+    <div class="tr"><span class="tn">CIA Parser</span><span class="badge bg">JS Pure</span></div>
+    <div class="tr"><span class="tn">SHA-256</span><span class="badge bg">WebCrypto</span></div>
+    <div class="tr"><span class="tn">VC Base</span><span class="badge bg">Auto-fetch</span></div>
+    <div class="tr"><span class="tn">Server</span><span class="badge bg">Nessuno</span></div>
   </div>
-
-  <div class="info-b">
-    <div class="ib-t">// INFO CIA CARICATO</div>
-    <div id="ciaSideInfo" style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);line-height:1.8;">
-      Nessun CIA caricato.
-    </div>
+  <div class="card">
+    <div class="ct">// LINK UTILI</div>
+    <a class="lnk" href="https://3ds.hacks.guide" target="_blank" rel="noopener">3ds.hacks.guide</a>
+    <a class="lnk" href="https://github.com/LumaTeam/Luma3DS" target="_blank" rel="noopener">Luma3DS</a>
+    <a class="lnk" href="https://github.com/Steveice10/FBI" target="_blank" rel="noopener">FBI Manager</a>
+    <a class="lnk" href="https://github.com/d0k3/GodMode9" target="_blank" rel="noopener">GodMode9</a>
+    <a class="lnk" href="https://github.com/Nazaretmax/nsui-web" target="_blank" rel="noopener">GitHub del progetto</a>
   </div>
 </div>
-
-</div><!-- /wrap -->
+</div><!-- /app -->
 
 <footer>
-  NSUI WEB · GBA to CIA Injector · <a href="https://github.com" target="_blank">GitHub</a> &nbsp;·&nbsp;
-  <a href="https://3ds.hacks.guide" target="_blank">3DS Hacks Guide</a> &nbsp;·&nbsp;
-  <a href="https://github.com/Luma3DS/Luma3DS" target="_blank">Luma3DS</a>
-  <br><br>
-  Solo per uso personale con backup e VC Base estratti legalmente dal proprio 3DS.
+  NSUI WEB v3 &nbsp;·&nbsp; GBA to CIA Injector &nbsp;·&nbsp; 100% Client-Side &nbsp;·&nbsp;
+  <a href="https://github.com/Nazaretmax/nsui-web" target="_blank">GitHub</a>
+  <br><br>Solo per uso personale con backup estratti legalmente dal proprio 3DS.
 </footer>
 
 <script>
-// ══════════════════════════════════════════════════
-//  NSUI WEB — FULL CIA INJECTOR
-//  GBA ROM → 3DS Virtual Console CIA
-// ══════════════════════════════════════════════════
+/* ================================================================
+   NSUI WEB v3 — GBA to CIA Injector
+   Auto-config da ROM · VC Base cached in IndexedDB
+   100% client-side · Zero server
+================================================================ */
 
-// ── STATE ──────────────────────────────────────────
-const S = {
-  romBytes: null,
-  romFile: null,
-  romInfo: {},
-  ciaBytes: null,
-  ciaFile: null,
-  ciaInfo: {},
-  iconBlob: null,
-  bannerColor: '#0d1b2a',
-  outputBlob: null,
-  busy: false
+// ── STATE
+const S = { rom:{bytes:null,file:null,info:null}, cia:{bytes:null,file:null,info:null},
+             icon:null, bannerColor:'#0a1428', outputBlob:null, busy:false };
+
+// ── VC BASE — Auto-fetch da repository
+const VC_URL = 'https://raw.githubusercontent.com/Nazaretmax/nsui-web/main/conv.cia';
+
+async function fetchVcBase(){
+  setVcStatus('loading','Scaricamento VC Base...','Connessione a GitHub...');
+  try{
+    const resp = await fetch(VC_URL);
+    if(!resp.ok) throw new Error('HTTP '+resp.status+' — file non trovato nella repo');
+    const total = parseInt(resp.headers.get('content-length')||'0');
+    const reader = resp.body.getReader();
+    const chunks = [];
+    let received = 0;
+    while(true){
+      const {done,value} = await reader.read();
+      if(done) break;
+      chunks.push(value); received+=value.length;
+      if(total>0) setVcStatus('loading','Scaricamento VC Base...','conv.cia · '+fsz(received)+' / '+fsz(total));
+      else setVcStatus('loading','Scaricamento VC Base...','conv.cia · '+fsz(received)+' ricevuti...');
+    }
+    const bytes = new Uint8Array(received);
+    let pos=0; for(const c of chunks){bytes.set(c,pos);pos+=c.length;}
+    return bytes;
+  }catch(err){
+    throw new Error('Download fallito: '+err.message);
+  }
+}
+
+function setVcStatus(state,title,sub){
+  const box=document.getElementById('vcStatusBox');
+  const spinner=document.getElementById('vcSpinner');
+  const t=document.getElementById('vcStatusTitle');
+  const s=document.getElementById('vcStatusSub');
+  t.textContent=title; s.textContent=sub;
+  if(state==='ok'){
+    box.style.background='rgba(0,255,136,.07)';
+    box.style.borderColor='rgba(0,255,136,.3)';
+    spinner.style.display='none';
+    const ico=document.createElement('div');
+    ico.style.cssText='width:20px;height:20px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;';
+    ico.textContent='✓';ico.style.color='var(--green)';
+    box.insertBefore(ico,box.firstChild);
+    t.style.color='var(--green)';
+  } else if(state==='err'){
+    box.style.background='rgba(255,51,85,.07)';
+    box.style.borderColor='rgba(255,51,85,.3)';
+    spinner.style.display='none';
+    t.style.color='var(--red)'; s.style.color='var(--red)';
+  }
+}
+
+// ── CIA CONSTANTS
+const CIA_HDR=0x2020, ALGN=64;
+const GBA_LOGO=new Uint8Array([
+  0x24,0xFF,0xAE,0x51,0x69,0x9A,0xA2,0x21,0x3D,0x84,0x82,0x0A,0x84,0xE4,0x09,0xAD,
+  0x11,0x24,0x8B,0x98,0xC0,0x81,0x7F,0x21,0xA3,0x52,0xBE,0x19,0x93,0x09,0xCE,0x20]);
+
+// ── UTILS
+const algn=(v,a)=>v%a===0?v:v+(a-v%a);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const u32=(b,o)=>(b[o]|(b[o+1]<<8)|(b[o+2]<<16)|(b[o+3]>>>0));
+const u32be=(b,o)=>(b[o]<<24|b[o+1]<<16|b[o+2]<<8|b[o+3])>>>0;
+const u16=(b,o)=>b[o]|(b[o+1]<<8);
+const u64=(b,o)=>u32(b,o)+u32(b,o+4)*0x100000000;
+function setU32(a,o,v){a[o]=v&255;a[o+1]=(v>>8)&255;a[o+2]=(v>>16)&255;a[o+3]=(v>>>24)&255;}
+function setU64(a,o,v){setU32(a,o,v>>>0);setU32(a,o+4,Math.floor(v/0x100000000)>>>0);}
+function find(hay,needle,s=0){
+  outer:for(let i=s;i<=hay.length-needle.length;i++){
+    for(let j=0;j<needle.length;j++)if(hay[i+j]!==needle[j])continue outer;return i;}return -1;}
+async function sha256(d){return new Uint8Array(await crypto.subtle.digest('SHA-256',d instanceof Uint8Array?d.buffer:d));}
+function hex(a,n=a.length){return Array.from(a.slice(0,n)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+function fsz(n){return n<1048576?(n/1024).toFixed(1)+'KB':(n/1048576).toFixed(2)+'MB';}
+function fxhash(s){let h=0x811c9dc5;for(let i=0;i<(s||'').length;i++)h=(Math.imul(h^s.charCodeAt(i),0x01000193))>>>0;return h.toString(16).padStart(8,'0').toUpperCase();}
+
+// ── GBA PARSER
+function parseGBA(d){
+  const dc=new TextDecoder('ascii');
+  const title=dc.decode(d.slice(0xA0,0xAC)).replace(/\0/g,'').trim();
+  const code=dc.decode(d.slice(0xAC,0xB0)).replace(/\0/g,'').trim();
+  const maker=dc.decode(d.slice(0xB0,0xB2)).replace(/\0/g,'').trim();
+  const fixed=d[0xB2],comp=d[0xBD];
+  let chk=0;for(let i=0xA0;i<=0xBC;i++)chk=(chk-d[i])&0xFF;chk=(chk-0x19)&0xFF;
+  const ok=chk===comp;
+  const rm={E:'EUR',P:'EUR',U:'USA',J:'JPN',K:'KOR',D:'GER',F:'FRA',I:'ITA',S:'ESP'};
+  return{title,code,maker,region:code[3]?(rm[code[3]]||'UNK'):'UNK',
+    comp:comp.toString(16).padStart(2,'0').toUpperCase(),checksumOk:ok,isGba:fixed===0x96,size:d.length};
+}
+
+// ── CIA PARSER
+function parseCIA(b){
+  const h={headerSize:u32(b,0),type:u16(b,4),version:u16(b,6),
+    certChainSize:u32(b,8),ticketSize:u32(b,0xC),tmdSize:u32(b,0x10),
+    metaSize:u32(b,0x14),contentSize:u64(b,0x18)};
+  const cert=algn(h.headerSize,ALGN),ticket=algn(cert+h.certChainSize,ALGN),
+    tmd=algn(ticket+h.ticketSize,ALGN),content=algn(tmd+h.tmdSize,ALGN);
+  h.off={cert,ticket,tmd,content};
+  const nm=content+0x100;
+  h.hasNCCH=nm+4<=b.length&&b[nm]===0x4E&&b[nm+1]===0x43&&b[nm+2]===0x43&&b[nm+3]===0x48;
+  h.validHdr=h.headerSize===CIA_HDR;
+  h.tmdP=parseTMD(b.subarray(tmd,tmd+h.tmdSize),tmd);
+  h.size=b.length; return h;
+}
+function parseTMD(buf,base){
+  const st=u32be(buf,0);let sl;
+  switch(st){case 0x10003:case 0x10004:sl=0x100;break;case 0x10005:sl=0x3C;break;default:sl=0x100;}
+  const sd=algn(4+sl,64),cc=(buf[sd+0x9E]<<8)|buf[sd+0x9F];
+  const iho=sd+0xA4,iro=sd+0xC4,cro=iro+64*36;
+  const chunks=[];
+  for(let i=0;i<cc;i++){const b2=cro+i*0x30;
+    chunks.push({hashAbsOff:base+b2+0x10});}
+  return{sd,cc,iho,iro,cro,chunks,ihoAbs:base+iho,iroAbs:base+iro,croAbs:base+cro};
+}
+function detectOrigSz(cia,romStart){
+  const sizes=[32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536].map(k=>k*1024);
+  for(const sz of sizes){
+    const end=romStart+sz; if(end>cia.length) break;
+    const s=cia.subarray(end,end+Math.min(64,cia.length-end));
+    if(s.every(b=>b===0xFF||b===0x00)) return sz;
+  }
+  return Math.max(0,S.cia.info.off.content+Number(S.cia.info.contentSize)-romStart);
+}
+
+// ── UI HELPERS
+function toast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className='on '+type;clearTimeout(t._t);t._t=setTimeout(()=>t.className='',3200);}
+function logln(cls,msg){const el=document.getElementById('log');el.classList.add('on');const s=document.createElement('span');s.className='ll '+cls;s.textContent=msg;el.appendChild(s);el.scrollTop=el.scrollHeight;}
+function setPrg(p,l){const v=Math.round(p);['prgB','hpb'].forEach(id=>document.getElementById(id).style.width=v+'%');document.getElementById('prgP').textContent=v+'%';document.getElementById('hpc').textContent=v+'%';document.getElementById('prgL').textContent=l;}
+function setStep(i,st){const el=document.getElementById('s'+i);el.className='si '+st;if(st==='done')el.querySelector('.sn').textContent='✓';}
+function autoField(id,v){const el=document.getElementById(id);el.value=v;el.classList.remove('auto-flash');void el.offsetWidth;el.classList.add('auto-flash');}
+
+// ── DROPZONE
+function dz(dzId,inpId,cb){
+  const d=document.getElementById(dzId),i=document.getElementById(inpId);
+  d.addEventListener('dragover',e=>{e.preventDefault();d.classList.add('over');});
+  d.addEventListener('dragleave',()=>d.classList.remove('over'));
+  d.addEventListener('drop',e=>{e.preventDefault();d.classList.remove('over');if(e.dataTransfer.files[0])cb(e.dataTransfer.files[0]);});
+  i.addEventListener('change',e=>{if(e.target.files[0])cb(e.target.files[0]);});
+}
+
+// ── ROM
+dz('dzRom','romFile',loadRom);
+function loadRom(file){
+  if(file.size>64*1024*1024){toast('File troppo grande (max 64MB)','err');return;}
+  const r=new FileReader();
+  r.onload=e=>{
+    const b=new Uint8Array(e.target.result);
+    S.rom={bytes:b,file:file,info:parseGBA(b)};
+    renderRomInfo(S.rom.info,file);
+    autoConfig(S.rom.info);
+    checkReady();
+    toast('ROM caricata: '+file.name,'ok');
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function renderRomInfo(info,file){
+  document.getElementById('dzRom').classList.add('ok');
+  document.getElementById('romLabel').textContent='+ '+file.name;
+  document.getElementById('romBadge').innerHTML='<span class="badge bg" style="font-size:7px;">OK</span>';
+  const rows=[
+    ['TITOLO',info.title||'-',info.title?'ok':'warn'],
+    ['GAME CODE',info.code||'-',info.code?'ok':'warn'],
+    ['MAKER',info.maker||'-',''],['REGIONE',info.region,''],
+    ['SIZE',fsz(info.size)+' ('+info.size.toLocaleString()+'B)',''],
+    ['CHECKSUM',info.checksumOk?'VALIDO ('+info.comp+')':'INVALIDO',info.checksumOk?'ok':'bad'],
+    ['HEADER',info.isGba?'GBA OK (0x96)':'Atipico',info.isGba?'ok':'warn'],
+  ];
+  const el=document.getElementById('romTbl');
+  el.innerHTML=rows.map(([k,v,c])=>`<div class="ir"><span class="ik">${k}</span><span class="iv ${c}">${v}</span></div>`).join('');
+  el.classList.add('on');
+  document.getElementById('stSize').textContent=(info.size/1048576).toFixed(1)+'M';
+  document.getElementById('stCode').textContent=info.code||'??';
+  document.getElementById('stChk').textContent=info.checksumOk?'OK':'ERR';
+  document.getElementById('stReg').textContent=info.region;
+}
+
+// ── AUTO-CONFIG CIA (dalla ROM)
+const PUB={
+  '01':'Nintendo','08':'Capcom','13':'Electronic Arts','18':'Hudson Soft',
+  '1F':'Virgin Games','28':'Kemco','30':'Infogrames','38':'THQ',
+  '39':'Accolade','41':'Ubisoft','47':'Spectrum HB','51':'Acclaim',
+  '52':'Activision','54':'Gametek','60':'Titus','67':'Ocean',
+  '69':'Electronic Arts','70':'Infogrames','71':'Interplay','78':'THQ',
+  '80':'Misawa','91':'Chun Soft','92':'Video System','93':'Ocean/Acclaim',
+  'A4':'Konami','AA':'Broderbund','AE':'Namco','AF':'Acclaim',
+  'B0':'ASCII','B1':'Bandai','B3':'Enix','B4':'HAL','B6':'SNK',
+  'B9':'Pony Canyon','BB':'Sunsoft','C0':'Taito','C2':'Kemco',
+  'C3':'Squaresoft','C5':'Data East','C8':'Koei','CA':'Konami',
+  'CB':'Ultra','CE':'Meldac','D1':'Sofel','D6':'Epoch',
+  'D9':'Banpresto','E0':'Jaleco','E8':'Asmik','EA':'King Records',
+  'EB':'Atlas','EC':'Epic/Sony','EE':'IGS'
 };
 
-// ── CIA UTILITIES ──────────────────────────────────
-const CIA_ALIGN = 64; // 0x40
-
-function alignTo(v, a){ return v % a === 0 ? v : v + (a - v % a); }
-
-function readU32LE(buf, o){ const v=new DataView(buf,o,4); return v.getUint32(0,true); }
-function readU32BE(buf, o){ const v=new DataView(buf,o,4); return v.getUint32(0,false); }
-function readU64LE(buf, o){
-  const lo=readU32LE(buf,o), hi=readU32LE(buf,o+4);
-  return hi*0x100000000+lo;
-}
-function writeU32LE(arr,o,v){ new DataView(arr.buffer,o,4).setUint32(0,v,true); }
-function writeU64LE(arr,o,v){
-  writeU32LE(arr,o,v>>>0);
-  writeU32LE(arr,o+4,Math.floor(v/0x100000000)>>>0);
-}
-
-function parseCIAHeader(buf){
-  return {
-    headerSize:    readU32LE(buf,0x00),
-    type:          new DataView(buf,0x04,2).getUint16(0,true),
-    version:       new DataView(buf,0x06,2).getUint16(0,true),
-    certChainSize: readU32LE(buf,0x08),
-    ticketSize:    readU32LE(buf,0x0C),
-    tmdSize:       readU32LE(buf,0x10),
-    metaSize:      readU32LE(buf,0x14),
-    contentSize:   readU64LE(buf,0x18),
-  };
-}
-
-function ciaOffsets(h){
-  const cert    = alignTo(h.headerSize,    CIA_ALIGN);
-  const ticket  = alignTo(cert+h.certChainSize, CIA_ALIGN);
-  const tmd     = alignTo(ticket+h.ticketSize,  CIA_ALIGN);
-  const content = alignTo(tmd+h.tmdSize,        CIA_ALIGN);
-  const meta    = alignTo(content+h.contentSize,CIA_ALIGN);
-  return {cert,ticket,tmd,content,meta};
-}
-
-// Parse TMD to find content hash location
-// TMD for RSA-2048-SHA256 (sig type 0x00010004):
-//   +0x000: sig type (4 BE)
-//   +0x004: sig (0x100 bytes)
-//   +0x104: padding (0x3C bytes)
-//   +0x140: signed data begins
-//     +0x1DE (=0x140+0x9E): content count (2 BE)
-//     +0x1E4: content info hash SHA-256 (32 bytes)
-//     +0x204: content info records (64 x 36 bytes = 0x900)
-//     +0xB04: content chunk records
-//       each: +0x00 contentID(4) +0x04 idx(2) +0x06 type(2) +0x08 size(8) +0x10 sha256(32)
-function parseTMD(tmdBuf){
-  const sigType = readU32BE(tmdBuf,0);
-  let sigLen;
-  if(sigType===0x00010003){ sigLen=0x100; } // RSA-2048 SHA1
-  else if(sigType===0x00010004){ sigLen=0x100; } // RSA-2048 SHA256
-  else if(sigType===0x00010005){ sigLen=0x3C; } // ECC SHA256
-  else sigLen=0x100; // default
-  
-  const sigBlockSize = 4 + sigLen + (64 - (4+sigLen)%64)%64;
-  const signedDataOffset = sigBlockSize; // = 0x140 for RSA-2048
-
-  const contentCount = new DataView(tmdBuf, signedDataOffset+0x9E, 2).getUint16(0,false);
-  const infoHashOffset = signedDataOffset + 0xA4;           // +0x1E4 from TMD start
-  const infoRecordsOffset = signedDataOffset + 0xC4;        // +0x204
-  const chunkRecordsOffset = infoRecordsOffset + 64*36;     // +0xB04
-
-  const chunks = [];
-  for(let i=0;i<contentCount;i++){
-    const base = chunkRecordsOffset + i*0x30;
-    chunks.push({
-      id:    readU32BE(tmdBuf, base+0x00),
-      index: new DataView(tmdBuf,base+0x04,2).getUint16(0,false),
-      type:  new DataView(tmdBuf,base+0x06,2).getUint16(0,false),
-      size:  readU64LE(tmdBuf, base+0x08),
-      hashOffset: base+0x10  // offset within tmdBuf where SHA-256 is stored
-    });
-  }
-  return { sigType, signedDataOffset, contentCount, infoHashOffset, infoRecordsOffset, chunkRecordsOffset, chunks };
-}
-
-// GBA Nintendo Logo (bytes 0x04..0x9F of every valid GBA ROM)
-// Using first 32 bytes as search pattern
-const GBA_LOGO_SIG = new Uint8Array([
-  0x24,0xFF,0xAE,0x51,0x69,0x9A,0xA2,0x21,0x3D,0x84,0x82,0x0A,0x84,0xE4,0x09,0xAD,
-  0x11,0x24,0x8B,0x98,0xC0,0x81,0x7F,0x21,0xA3,0x52,0xBE,0x19,0x93,0x09,0xCE,0x20
-]);
-
-// Find byte pattern in Uint8Array
-function findPattern(data, pattern, start=0){
-  outer: for(let i=start;i<=data.length-pattern.length;i++){
-    for(let j=0;j<pattern.length;j++) if(data[i+j]!==pattern[j]) continue outer;
-    return i;
-  }
-  return -1;
-}
-
-// SHA-256 via WebCrypto
-async function sha256(data){
-  const h = await crypto.subtle.digest('SHA-256', data instanceof Uint8Array ? data.buffer : data);
-  return new Uint8Array(h);
-}
-
-// SHA-256 of a range within a Uint8Array
-async function sha256Range(arr, offset, len){
-  return sha256(arr.slice(offset, offset+len));
-}
-
-// ── GBA ROM PARSER ─────────────────────────────────
-function parseGBA(data){
-  const dec = new TextDecoder('ascii');
-  const title   = dec.decode(data.slice(0xA0,0xAC)).replace(/\0/g,'').trim();
-  const code    = dec.decode(data.slice(0xAC,0xB0)).replace(/\0/g,'').trim();
-  const maker   = dec.decode(data.slice(0xB0,0xB2)).replace(/\0/g,'').trim();
-  const fixedV  = data[0xB2];
-  const comp    = data[0xBD];
-  
-  let chk = 0;
-  for(let i=0xA0;i<=0xBC;i++) chk=(chk-data[i])&0xFF;
-  chk=(chk-0x19)&0xFF;
-  const checksumOk = chk === comp;
-
-  const regionMap={E:'EUR',P:'EUR',U:'USA',J:'JPN',K:'KOR',D:'GER',F:'FRA',I:'ITA',S:'ESP'};
-  const region = regionMap[code[3]] || 'UNK';
-  const sizeMB = (data.length/1048576).toFixed(2);
-
-  return {title,code,maker,region,comp:comp.toString(16).padStart(2,'0').toUpperCase(),checksumOk,sizeMB,isGba:fixedV===0x96,length:data.length};
-}
-
-// ── CIA BASE PARSER ────────────────────────────────
-function parseCIAInfo(buf, filename){
-  const bytes = new Uint8Array(buf);
-  const h = parseCIAHeader(buf);
-  const off = ciaOffsets(h);
-  
-  // Check magic (headerSize should be 0x2020 for standard CIA)
-  const valid = h.headerSize === 0x2020;
-  
-  // Check for NCCH magic "NCCH" in content
-  let ncchOffset = -1;
-  const ncchMagic = new Uint8Array([0x4E,0x43,0x43,0x48]); // "NCCH"
-  // NCCH magic is at content_offset + 0x100
-  const expectedNcchMagicOff = off.content + 0x100;
-  const slice = bytes.slice(expectedNcchMagicOff, expectedNcchMagicOff+4);
-  if(slice[0]===0x4E&&slice[1]===0x43&&slice[2]===0x43&&slice[3]===0x48){
-    ncchOffset = off.content;
-  }
-  
-  // Parse TMD for content info
-  const tmdData = buf.slice(off.tmd, off.tmd+h.tmdSize);
-  let tmd;
-  try{ tmd = parseTMD(tmdData); } catch(e){ tmd=null; }
-
-  const sizeMB = (buf.byteLength/1048576).toFixed(2);
-  
-  return {
-    valid, sizeMB, filename,
-    headerSize:h.headerSize, certChainSize:h.certChainSize,
-    ticketSize:h.ticketSize, tmdSize:h.tmdSize, metaSize:h.metaSize,
-    contentSize:h.contentSize,
-    offsets:off, tmd,
-    hasNCCH: ncchOffset>=0,
-    ncchOffset,
-    raw: bytes
-  };
-}
-
-// ── MAIN INJECTION FUNCTION ────────────────────────
-async function injectROM(ciaInfo, romBytes, config){
-  const cia = ciaInfo.raw;
-  const off = ciaInfo.offsets;
-  const h   = ciaInfo;
-
-  log('info','[CIA]  headerSize='+h.headerSize.toString(16).toUpperCase()+
-    '  certChain='+h.certChainSize+
-    '  ticket='+h.ticketSize+
-    '  tmd='+h.tmdSize);
-  log('info','[CIA]  contentOffset=0x'+off.content.toString(16).toUpperCase()+
-    '  contentSize='+h.contentSize+' bytes');
-
-  // 1. Find GBA ROM inside CIA content
-  setStep(2,'active');
-  setProgress(40,'Ricerca ROM nel content...');
-  
-  // Search starting from content section
-  const logoIdx = findPattern(cia, GBA_LOGO_SIG, off.content);
-  if(logoIdx < 0){
-    throw new Error(
-      'ROM GBA non trovata nel CIA base.\n'+
-      'Assicurati di usare un CIA VC GBA valido estratto dal tuo N3DS.\n'+
-      'Il CIA base deve contenere una ROM GBA originale al suo interno.'
-    );
-  }
-  
-  // GBA logo is at offset 4 within the ROM header
-  const romStartInCIA = logoIdx - 4;
-  log('ok', '[FIND] GBA ROM trovata a offset 0x'+romStartInCIA.toString(16).toUpperCase()+' nel CIA');
-  log('dim','[FIND] Logo pattern a 0x'+logoIdx.toString(16).toUpperCase());
-
-  // 2. Detect original ROM size stored in the CIA
-  // Try to read the size from NCCH header if available
-  let origRomSize = 0;
-  if(h.hasNCCH){
-    // NCCH header: RomFS offset at +0x1A0 (in media units, 1 unit = 0x200)
-    // and RomFS size at +0x1A4 (media units)
-    const ncchBase = off.content;
-    const romfsOffMU = readU32LE(cia.buffer, ncchBase + 0x1A4); // RomFS offset (media units)
-    const romfsSizeMU = readU32LE(cia.buffer, ncchBase + 0x1A8); // RomFS size (media units)
-    if(romfsOffMU > 0 && romfsSizeMU > 0){
-      origRomSize = romfsSizeMU * 0x200;
-      log('dim','[NCCH] RomFS size: '+origRomSize+' bytes ('+romfsSizeMU+' media units)');
-    }
-  }
-  
-  // Fallback: find original ROM size by scanning for next non-FF bytes after potential ROM end
-  if(origRomSize === 0){
-    // Try common GBA ROM sizes
-    const romSizes = [256*1024, 512*1024, 1*1024*1024, 2*1024*1024, 4*1024*1024,
-                      8*1024*1024, 16*1024*1024, 32*1024*1024];
-    for(const sz of romSizes){
-      if(romStartInCIA + sz <= cia.length){
-        // Check if bytes beyond this size look like padding
-        const checkOff = romStartInCIA + sz;
-        const sample = cia.slice(checkOff, checkOff+64);
-        const isPad = sample.every(b => b===0xFF||b===0x00);
-        if(isPad){ origRomSize = sz; break; }
-      }
-    }
-  }
-  
-  if(origRomSize === 0){
-    // Last resort: use remaining content space
-    origRomSize = h.contentSize - (romStartInCIA - off.content);
-    log('warn','[SIZE] Dimensione ROM originale non rilevata, uso spazio rimanente: '+origRomSize+' bytes');
-  } else {
-    log('ok','[SIZE] ROM originale: '+origRomSize+' bytes');
-  }
-  
-  log('ok','[SIZE] Nuova ROM: '+romBytes.length+' bytes');
-
-  setStep(2,'done');
-
-  // 3. Build new CIA
-  setStep(3,'active');
-  setProgress(55,'Iniezione payload...');
-
-  // Calculate new content size
-  // Keep same structure, just replace ROM bytes
-  const newContentSize = h.contentSize + (romBytes.length - origRomSize);
-  
-  if(newContentSize < 0){
-    throw new Error('Errore: la nuova ROM è più piccola del previsto.');
-  }
-
-  const newCIASize = off.content + newContentSize + (h.metaSize > 0 ? alignTo(newContentSize, CIA_ALIGN) - newContentSize + h.metaSize : 0);
-  
-  // Build output buffer
-  // Copy everything before ROM, insert new ROM, copy rest
-  const beforeRomLen = romStartInCIA;
-  const afterRomStart = romStartInCIA + origRomSize;
-  const afterRomLen = cia.length - afterRomStart;
-
-  log('dim','[BUILD] beforeROM='+beforeRomLen+'  newROM='+romBytes.length+'  afterROM='+afterRomLen);
-
-  const out = new Uint8Array(beforeRomLen + romBytes.length + afterRomLen);
-  out.set(cia.slice(0, beforeRomLen), 0);
-  out.set(romBytes, beforeRomLen);
-  out.set(cia.slice(afterRomStart), beforeRomLen + romBytes.length);
-
-  log('ok','[BUILD] Output CIA assemblato: '+(out.length/1024/1024).toFixed(2)+' MB');
-  setStep(3,'done');
-
-  // 4. Update NCCH header sizes if needed
-  setStep(4,'active');
-  setProgress(68,'Aggiornamento header NCCH...');
-  
-  if(h.hasNCCH && romBytes.length !== origRomSize){
-    const ncchBase = off.content;
-    const sizeDiff = romBytes.length - origRomSize;
-    const sizeDiffMU = Math.ceil(sizeDiff / 0x200);
-    
-    // Update RomFS size in NCCH header (offset +0x1A8, media units)
-    const oldRomfsSizeMU = readU32LE(out.buffer, ncchBase + 0x1A8);
-    const newRomfsSizeMU = Math.max(0, oldRomfsSizeMU + sizeDiffMU);
-    writeU32LE(out, ncchBase + 0x1A8, newRomfsSizeMU);
-    
-    // Update NCCH total size (offset +0x04, media units)
-    const oldNCCHSizeMU = readU32LE(out.buffer, ncchBase + 0x04);
-    const newNCCHSizeMU = Math.max(1, oldNCCHSizeMU + sizeDiffMU);
-    writeU32LE(out, ncchBase + 0x04, newNCCHSizeMU);
-    
-    log('dim','[NCCH] Aggiornati: size '+oldNCCHSizeMU+'→'+newNCCHSizeMU+' MU, RomFS '+oldRomfsSizeMU+'→'+newRomfsSizeMU+' MU');
-  }
-  
-  // Update CIA header content size
-  const sizeDiffFull = romBytes.length - origRomSize;
-  const newCS = h.contentSize + sizeDiffFull;
-  writeU64LE(out, 0x18, newCS);
-  log('ok','[NCCH] Header aggiornato');
-  setStep(4,'done');
-
-  // 5. Update TMD content hash
-  setStep(5,'active');
-  setProgress(80,'Ricalcolo hash SHA-256 TMD...');
-
-  // Reparse TMD from new output
-  const tmdStart = off.tmd;
-  const tmdEnd   = off.tmd + h.tmdSize;
-  const newContentStart = off.content;
-  const newContentEnd   = newContentStart + newCS;
-
-  // Compute SHA-256 of new content
-  const contentData = out.slice(newContentStart, newContentEnd);
-  const contentHash = await sha256(contentData);
-  log('dim','[SHA2] Content hash: '+Array.from(contentHash.slice(0,8)).map(b=>b.toString(16).padStart(2,'0')).join('')+'...');
-
-  // Find and update chunk record hash in TMD
-  if(ciaInfo.tmd && ciaInfo.tmd.chunks.length > 0){
-    const chunkHashOff = tmdStart + ciaInfo.tmd.chunks[0].hashOffset;
-    out.set(contentHash, chunkHashOff);
-    log('ok','[TMD]  Content chunk hash aggiornato a offset 0x'+chunkHashOff.toString(16).toUpperCase());
-    
-    // Update content size in chunk record
-    const chunkBase = tmdStart + ciaInfo.tmd.chunkRecordsOffset;
-    writeU64LE(out, chunkBase + 0x08, newCS);
-    log('dim','[TMD]  Content size aggiornato: '+newCS+' bytes');
-
-    // Recompute content info record hash
-    const infoRecLen = 64 * 36;
-    const infoRecData = out.slice(tmdStart + ciaInfo.tmd.infoRecordsOffset, tmdStart + ciaInfo.tmd.infoRecordsOffset + infoRecLen);
-    // The content info[0] has hash of chunk records
-    // Compute SHA-256 of chunk records and put in info record[0]
-    const chunkRecData = out.slice(tmdStart + ciaInfo.tmd.chunkRecordsOffset, tmdStart + ciaInfo.tmd.chunkRecordsOffset + 0x30);
-    const infoHash = await sha256(chunkRecData);
-    out.set(infoHash, tmdStart + ciaInfo.tmd.infoRecordsOffset + 4); // +4 to skip index/count fields
-    log('dim','[TMD]  Content info record hash aggiornato');
-
-    // Recompute info records hash
-    const allInfoData = out.slice(tmdStart + ciaInfo.tmd.infoRecordsOffset, tmdStart + ciaInfo.tmd.infoRecordsOffset + infoRecLen);
-    const infoRecHash = await sha256(allInfoData);
-    out.set(infoRecHash, tmdStart + ciaInfo.tmd.infoHashOffset);
-    log('ok','[TMD]  Info records hash aggiornato');
-  } else {
-    log('warn','[TMD]  Struttura TMD non riconosciuta, hash non aggiornato automaticamente');
-    log('warn','[TMD]  Il CIA potrebbe non installarsi su 3DS senza sigpatches avanzate');
-  }
-
-  setStep(5,'done');
-
-  // 6. Done
-  setStep(6,'active');
-  setProgress(95,'Verifica finale...');
-  await new Promise(r=>setTimeout(r,300));
-  
-  const finalHash = await sha256(out);
-  const hashHex = Array.from(finalHash.slice(0,16)).map(b=>b.toString(16).padStart(2,'0')).join('');
-  log('ok','[OUT]  SHA-256(16): '+hashHex.toUpperCase());
-  log('ok','[OUT]  Size finale: '+(out.length/1024/1024).toFixed(2)+' MB ('+out.length.toLocaleString()+' bytes)');
-  setStep(6,'done');
-  setProgress(100,'Completato!');
-
-  return { data: out, hash: hashHex };
-}
-
-// ── UI HELPERS ─────────────────────────────────────
-function log(type, msg){
-  const el = document.getElementById('log');
-  el.classList.add('show');
-  const s = document.createElement('span');
-  s.className='ll '+type;
-  s.textContent = msg;
-  el.appendChild(s);
-  el.scrollTop = el.scrollHeight;
-}
-
-function setProgress(pct, txt){
-  document.getElementById('pgFill').style.width = pct+'%';
-  document.getElementById('pgPct').textContent = pct+'%';
-  document.getElementById('pgTxt').textContent = txt;
-}
-
-function setStep(idx, state){
-  const el = document.getElementById('s'+idx);
-  el.className = 'si '+state;
-  if(state==='done') el.querySelector('.sn').textContent='✓';
-}
-
-// ── TABS ───────────────────────────────────────────
-document.querySelectorAll('.step-pill').forEach(b=>{
-  b.addEventListener('click',()=>{
-    const t = b.dataset.t;
-    document.querySelectorAll('.step-pill').forEach(x=>x.classList.remove('on'));
-    document.querySelectorAll('.tab-c').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on');
-    document.getElementById('t-'+t).classList.add('on');
-  });
-});
-
-// ── DRAG & DROP ────────────────────────────────────
-function setupDZ(dzId, inputId, accept, onFile){
-  const dz = document.getElementById(dzId);
-  const inp = document.getElementById(inputId);
-  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
-  dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
-  dz.addEventListener('drop',e=>{
-    e.preventDefault(); dz.classList.remove('over');
-    const f=e.dataTransfer.files[0];
-    if(f) onFile(f);
-  });
-  inp.addEventListener('change',e=>{ if(e.target.files[0]) onFile(e.target.files[0]); });
-}
-
-// ── ROM FILE HANDLER ───────────────────────────────
-setupDZ('dz-rom','romFile','.gba,.agb,.bin', file=>{
-  const reader = new FileReader();
-  reader.onload = e=>{
-    S.romBytes = new Uint8Array(e.target.result);
-    S.romFile = file;
-    S.romInfo = parseGBA(S.romBytes);
-    showRomInfo(S.romInfo, file);
-    autoFillFromROM(S.romInfo);
-    checkReady();
-  };
-  reader.readAsArrayBuffer(file);
-});
-
-function showRomInfo(info, file){
-  const dz = document.getElementById('dz-rom');
-  dz.classList.add('ready');
-  document.getElementById('romDzTitle').textContent='✓ '+file.name;
-  
-  const rows=[
-    ['TITOLO',   info.title||'(non trovato)', info.title?'ok':'warn'],
-    ['GAME CODE',info.code||'—',              info.code?'ok':'warn'],
-    ['MAKER',    info.maker||'—',             ''],
-    ['REGIONE',  info.region,                 ''],
-    ['SIZE',     info.sizeMB+' MB ('+info.length.toLocaleString()+' bytes)',''],
-    ['CHECKSUM', info.checksumOk?'✓ VALIDO ('+info.comp+')':'✗ INVALIDO', info.checksumOk?'ok':'bad'],
-    ['FORMATO',  info.isGba?'✓ GBA Header OK':'⚠ Header non standard', info.isGba?'ok':'warn'],
-  ];
-  
-  const el=document.getElementById('romInfo');
-  el.innerHTML=rows.map(([l,v,c])=>`<div class="ri-row"><span class="rl">${l}</span><span class="rv ${c}">${v}</span></div>`).join('');
-  el.classList.add('show');
-
-  // Sidebar stats
-  document.getElementById('sSize').textContent=info.sizeMB+'M';
-  document.getElementById('sCode').textContent=info.code||'??';
-  document.getElementById('sChk').textContent=info.checksumOk?'OK':'ERR';
-  document.getElementById('sReg').textContent=info.region;
-}
-
-function autoFillFromROM(info){
-  if(info.title) document.getElementById('gameTitle').value=info.title;
-  if(info.maker) document.getElementById('makerCode').value=info.maker;
-  const rm={'EUR':'EUR','USA':'USA','JPN':'JPN','KOR':'KOR'};
+function autoConfig(info){
+  if(info.title) autoField('gameTitle',info.title);
+  const pub=PUB[(info.maker||'').toUpperCase()];
+  if(pub) autoField('gamePublisher',pub);
+  const rm={EUR:'EUR',USA:'USA',JPN:'JPN',KOR:'KOR',GER:'EUR',FRA:'EUR',ITA:'EUR',ESP:'EUR'};
   if(rm[info.region]) document.getElementById('gameRegion').value=rm[info.region];
-  if(info.region==='JPN') document.getElementById('gameLang').value='ja';
-  document.getElementById('titleId').value='00040000'+genTitleId(info.code);
-  document.getElementById('productCode').value='CTR-P-'+(info.code||'AXXX');
+  const lm={JPN:'ja',KOR:'ko',GER:'de',FRA:'fr',ESP:'es'};
+  document.getElementById('gameLang').value=lm[info.region]||'it';
+  autoField('titleId','00040000'+fxhash(info.code));
+  autoField('productCode','CTR-P-'+(info.code||'AXXX'));
+  if(info.maker) autoField('makerCode',info.maker);
+  document.getElementById('gameDesc').value=(info.title||'GBA Game')+' — Virtual Console per Nintendo 3DS';
+  autoGenIcon(info);
   updateBanner();
 }
 
-function genTitleId(code){
-  let h=0x811c9dc5;
-  for(let i=0;i<(code||'').length;i++) h=Math.imul(h^code.charCodeAt(i),0x01000193)>>>0;
-  return h.toString(16).padStart(8,'0').toUpperCase();
+// ── CIA (VC Base)
+function renderCiaInfo(info,filename){
+  const rows=[
+    ['FILE',filename,''],['SIZE',fsz(info.size),''],
+    ['HEADER',info.validHdr?'CIA valido':'Atipico',info.validHdr?'ok':'warn'],
+    ['NCCH',info.hasNCCH?'Trovato':'N/A',info.hasNCCH?'ok':'warn'],
+    ['TMD',info.tmdP?info.tmdP.cc+' chunk':'N/A',info.tmdP?'ok':'warn'],
+    ['CONTENT',fsz(Number(info.contentSize)),''],
+  ];
+  const el=document.getElementById('ciaTbl');
+  el.innerHTML=rows.map(([k,v,c])=>`<div class="ir"><span class="ik">${k}</span><span class="iv ${c}">${v}</span></div>`).join('');
+  el.classList.add('on');
 }
 
-// ── CIA FILE HANDLER ───────────────────────────────
-setupDZ('dz-cia','ciaFile','.cia,.3ds', file=>{
-  const reader = new FileReader();
-  reader.onload = e=>{
-    const buf = e.target.result;
-    try{
-      S.ciaInfo = parseCIAInfo(buf, file.name);
-      S.ciaFile = file;
-      showCIAInfo(S.ciaInfo, file);
-      checkReady();
-    } catch(err){
-      document.getElementById('dz-cia').classList.add('err')||
-      document.getElementById('ciaDzTitle').textContent='✗ Errore: '+err.message;
-      console.error(err);
-    }
-  };
-  reader.readAsArrayBuffer(file);
-});
-
-function showCIAInfo(info, file){
-  const dz = document.getElementById('dz-cia');
-  dz.classList.add('ready');
-  document.getElementById('ciaDzTitle').textContent='✓ '+file.name;
-  
-  const valid = info.valid ? '✓ CIA valido' : '⚠ Struttura inattesa';
-  const hasncc = info.hasNCCH ? '✓ NCCH trovato' : '⚠ NCCH non trovato';
-  const tmdOk = info.tmd && info.tmd.chunks.length>0 ? '✓ TMD ('+info.tmd.chunks.length+' chunk)' : '⚠ TMD non leggibile';
-  
-  const el = document.getElementById('ciaInfo');
-  el.innerHTML=`
-    <div class="ri-row"><span class="rl">FILE</span><span class="rv">${file.name}</span></div>
-    <div class="ri-row"><span class="rl">SIZE</span><span class="rv">${info.sizeMB} MB</span></div>
-    <div class="ri-row"><span class="rl">HEADER</span><span class="rv ${info.valid?'ok':'warn'}">${valid}</span></div>
-    <div class="ri-row"><span class="rl">NCCH</span><span class="rv ${info.hasNCCH?'ok':'warn'}">${hasncc}</span></div>
-    <div class="ri-row"><span class="rl">TMD</span><span class="rv ${info.tmd?'ok':'warn'}">${tmdOk}</span></div>
-    <div class="ri-row"><span class="rl">CONTENT</span><span class="rv">${(info.contentSize/1048576).toFixed(2)} MB</span></div>
-  `;
-  el.style.cssText='display:block;background:rgba(0,0,0,.3);border:1px solid var(--border2);border-radius:3px;padding:10px;margin-top:10px;';
-  
-  // Sidebar
-  document.getElementById('ciaSideInfo').innerHTML=
-    `File: ${file.name}<br>Size: ${info.sizeMB} MB<br>Header: ${info.valid?'Valido':'Invalido'}<br>NCCH: ${info.hasNCCH?'Trovato':'Non trovato'}<br>TMD chunks: ${info.tmd?info.tmd.chunks.length:'?'}`;
-}
-
-// ── CHECK READY ────────────────────────────────────
-function checkReady(){
-  const ok = S.romBytes && S.ciaInfo && S.ciaInfo.valid;
-  document.getElementById('convertBtn').disabled = !ok;
-}
-
-// ── ICON ───────────────────────────────────────────
-document.getElementById('iconFile').addEventListener('change',e=>{
-  const f=e.target.files[0]; if(!f) return;
-  S.iconBlob=f;
-  const url=URL.createObjectURL(f);
-  document.getElementById('iconPrev').innerHTML=`<img src="${url}">`;
-  document.getElementById('bnrIcon').innerHTML=`<img src="${url}" style="width:100%;height:100%;object-fit:cover;">`;
-});
-
-document.getElementById('autoIcon').addEventListener('click',()=>{
-  const c=document.createElement('canvas'); c.width=48; c.height=48;
+// ── ICON
+function autoGenIcon(info){
+  const c=document.createElement('canvas');c.width=48;c.height=48;
   const x=c.getContext('2d');
-  const t=document.getElementById('gameTitle').value||'GBA';
-  const code=S.romInfo.code||'??';
-  const cols=['#003366','#330033','#003300','#332200','#220033'];
-  x.fillStyle=cols[Math.abs((code.charCodeAt(0)||0))%cols.length];
-  x.fillRect(0,0,48,48);
-  x.fillStyle='rgba(255,255,255,.08)'; x.fillRect(3,3,22,22);
-  x.fillStyle='#fff'; x.font='bold 11px monospace'; x.textAlign='center'; x.textBaseline='middle';
-  x.fillText(t.slice(0,3).toUpperCase(),24,27);
-  x.font='6px monospace'; x.fillStyle='rgba(255,255,255,.5)';
-  x.fillText(code,24,39);
+  const t=info.title||'GBA',code=info.code||'??';
+  const cols=['#003d8f','#8f0030','#005c2b','#5c0070','#7a3800'];
+  x.fillStyle=cols[Math.abs(code.charCodeAt(0)||0)%cols.length];x.fillRect(0,0,48,48);
+  const g=x.createLinearGradient(0,0,48,48);
+  g.addColorStop(0,'rgba(255,255,255,.12)');g.addColorStop(1,'rgba(0,0,0,.22)');
+  x.fillStyle=g;x.fillRect(0,0,48,48);
+  x.fillStyle='rgba(255,255,255,.9)';x.font='bold 10px monospace';
+  x.textAlign='center';x.textBaseline='middle';
+  x.fillText(t.slice(0,4).toUpperCase(),24,25);
+  x.font='5.5px monospace';x.fillStyle='rgba(255,255,255,.38)';x.fillText(code,24,38);
   const url=c.toDataURL();
   document.getElementById('iconPrev').innerHTML=`<img src="${url}">`;
-  document.getElementById('bnrIcon').innerHTML=`<img src="${url}" style="width:100%;height:100%;object-fit:cover;">`;
-  c.toBlob(b=>S.iconBlob=b);
+  document.getElementById('bnrIco').innerHTML=`<img src="${url}" style="width:100%;height:100%;object-fit:cover;">`;
+  c.toBlob(b=>S.icon=b);
+}
+
+document.getElementById('iconFile').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;S.icon=f;
+  const url=URL.createObjectURL(f);
+  document.getElementById('iconPrev').innerHTML=`<img src="${url}">`;
+  document.getElementById('bnrIco').innerHTML=`<img src="${url}" style="width:100%;height:100%;object-fit:cover;">`;
+});
+document.getElementById('autoIconBtn').addEventListener('click',()=>{
+  S.rom.info?autoGenIcon(S.rom.info):toast('Carica prima una ROM','err');
 });
 
-// ── COLOR SWATCHES ─────────────────────────────────
+// ── COLOR
 document.querySelectorAll('.csw').forEach(s=>{
   s.addEventListener('click',()=>{
-    document.querySelectorAll('.csw').forEach(x=>x.classList.remove('sel'));
-    s.classList.add('sel');
-    S.bannerColor=s.dataset.c;
+    document.querySelectorAll('.csw').forEach(x=>x.classList.remove('on'));
+    s.classList.add('on');S.bannerColor=s.dataset.c;
   });
 });
 
-// ── BANNER PREVIEW ─────────────────────────────────
+// ── BANNER
 function updateBanner(){
-  const t=document.getElementById('gameTitle').value||'Nome Gioco';
-  const p=document.getElementById('gamePublisher').value||'Publisher';
-  document.getElementById('bnrTitle').textContent=t;
-  document.getElementById('bnrDesc').textContent=p;
+  document.getElementById('bnrT').textContent=document.getElementById('gameTitle').value||'Nome Gioco';
+  document.getElementById('bnrP').textContent=document.getElementById('gamePublisher').value||'Publisher';
 }
 ['gameTitle','gamePublisher'].forEach(id=>document.getElementById(id).addEventListener('input',updateBanner));
 
-// ── CONVERT ────────────────────────────────────────
-document.getElementById('convertBtn').addEventListener('click', async()=>{
-  if(S.busy||!S.romBytes||!S.ciaInfo) return;
+// ── TABS
+document.querySelectorAll('.tab').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const t=b.dataset.t;
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.tp').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');document.getElementById('t-'+t).classList.add('on');
+  });
+});
+
+document.querySelectorAll('input,select,textarea').forEach(el=>{
+  el.addEventListener('focus',()=>el.closest('.panel')?.classList.add('lit'));
+  el.addEventListener('blur',()=>el.closest('.panel')?.classList.remove('lit'));
+});
+
+function checkReady(){
+  document.getElementById('convertBtn').disabled=!(S.rom.bytes&&S.cia.bytes&&S.cia.info?.validHdr);
+}
+
+// ── INJECT
+document.getElementById('convertBtn').addEventListener('click',async()=>{
+  if(S.busy||!S.rom.bytes||!S.cia.bytes)return;
   S.busy=true;
-  
-  const logEl=document.getElementById('log');
-  const pgw=document.getElementById('pgw');
-  const sl=document.getElementById('stepsList');
-  const outCard=document.getElementById('outCard');
-
-  logEl.innerHTML='';
-  logEl.classList.add('show');
-  pgw.classList.add('show');
-  sl.style.display='flex';
-  outCard.classList.remove('show');
+  document.getElementById('log').innerHTML='';document.getElementById('log').classList.remove('on');
+  document.getElementById('prgW').classList.add('on');
+  document.getElementById('stepsEl').classList.add('on');
+  document.getElementById('outCard').classList.remove('on');
+  document.getElementById('dlBtn').classList.remove('on');
+  document.getElementById('hprog').classList.add('on');
   document.getElementById('convertBtn').disabled=true;
+  for(let i=0;i<7;i++){const el=document.getElementById('s'+i);el.className='si';el.querySelector('.sn').textContent=i+1;}
 
-  // Reset steps
-  for(let i=0;i<7;i++){
-    const el=document.getElementById('s'+i);
-    el.className='si';
-    el.querySelector('.sn').textContent=i+1;
-  }
-
-  const title = document.getElementById('gameTitle').value||S.romInfo.title||'Unknown Game';
-  
+  const title=document.getElementById('gameTitle').value||S.rom.info?.title||'Unknown';
   try{
-    // Step 0: Validate ROM
-    setStep(0,'active');
-    setProgress(8,'Validazione ROM GBA...');
-    log('info','[INIT] NSUI Web — Avvio iniezione GBA→CIA');
-    log('dim', '[ROM]  File: '+S.romFile.name+' ('+S.romBytes.length.toLocaleString()+' bytes)');
-    await sleep(250);
-    
-    if(!S.romInfo.isGba){
-      log('warn','[ROM]  Header non standard (fixed byte != 0x96)');
-    } else {
-      log('ok','[ROM]  Header GBA valido ✓');
-    }
-    log(S.romInfo.checksumOk?'ok':'warn',
-      '[ROM]  Checksum: '+(S.romInfo.checksumOk?'VALIDO':'AVVERTIMENTO'));
+    setStep(0,'active');setPrg(5,'Validazione ROM...');
+    logln('info','[NSUI] v3 — GBA to CIA Injector');
+    logln('dim','[ROM]  '+S.rom.file.name+' · '+fsz(S.rom.bytes.length));
+    await sleep(180);
+    logln(S.rom.info.isGba?'ok':'warn','[ROM]  Header: '+(S.rom.info.isGba?'VALIDO':'ATIPICO'));
+    logln(S.rom.info.checksumOk?'ok':'warn','[ROM]  Checksum: '+(S.rom.info.checksumOk?'OK':'WARN'));
     setStep(0,'done');
-    
-    // Step 1: Parse CIA
-    setStep(1,'active');
-    setProgress(22,'Parsing CIA base...');
-    log('dim','[CIA]  File: '+S.ciaFile.name+' ('+S.ciaInfo.sizeMB+' MB)');
-    await sleep(300);
-    log('ok','[CIA]  Header CIA: '+(S.ciaInfo.valid?'VALIDO ✓':'ATTENZIONE - struttura inattesa'));
-    log('ok','[CIA]  NCCH content: '+(S.ciaInfo.hasNCCH?'TROVATO ✓':'NON TROVATO - ricerca ROM..'));
-    if(S.ciaInfo.tmd && S.ciaInfo.tmd.chunks.length>0){
-      log('ok','[CIA]  TMD: '+S.ciaInfo.tmd.chunks.length+' content chunk(s) ✓');
-    }
+
+    setStep(1,'active');setPrg(16,'Parsing CIA Base...');
+    const ci=S.cia.info;
+    logln('dim','[CIA]  '+S.cia.file.name+' · '+fsz(S.cia.bytes.length));
+    await sleep(180);
+    logln('ok','[CIA]  Header: '+(ci.validHdr?'VALIDO':'WARN'));
+    logln('ok','[CIA]  NCCH: '+(ci.hasNCCH?'TROVATO':'ricerco ROM...'));
+    logln('ok','[CIA]  TMD: '+(ci.tmdP?.cc??'?')+' chunk(s)');
     setStep(1,'done');
 
-    // Steps 2-6: inject
-    const result = await injectROM(S.ciaInfo, S.romBytes, {title});
+    setStep(2,'active');setPrg(32,'Localizzazione ROM...');
+    await sleep(140);
+    const logoIdx=find(S.cia.bytes,GBA_LOGO,ci.off.content);
+    if(logoIdx<0) throw new Error('ROM GBA non trovata nel CIA.\nUsa un CIA VC GBA valido (Metroid Fusion, F-Zero GP Legend, ecc.)');
+    const romStart=logoIdx-4;
+    logln('ok','[FIND] GBA Logo @ 0x'+logoIdx.toString(16).toUpperCase());
+    logln('ok','[FIND] ROM @ 0x'+romStart.toString(16).toUpperCase());
+    setStep(2,'done');
 
-    // Done
-    const safeTitle = title.replace(/[^a-z0-9_\-]/gi,'_');
-    const fname = safeTitle+'.cia';
-    document.getElementById('outName').textContent=fname;
-    document.getElementById('outSize').textContent=(result.data.length/1024/1024).toFixed(2)+' MB';
-    document.getElementById('outHash').textContent=result.hash.toUpperCase();
-    outCard.classList.add('show');
+    setStep(3,'active');setPrg(46,'Iniezione...');
+    await sleep(120);
+    const origSz=detectOrigSz(S.cia.bytes,romStart);
+    logln('dim','[SIZE] Orig: '+fsz(origSz)+' → New: '+fsz(S.rom.bytes.length));
+    const before=romStart,after=romStart+origSz;
+    const out=new Uint8Array(before+S.rom.bytes.length+(S.cia.bytes.length-after));
+    out.set(S.cia.bytes.subarray(0,before),0);
+    out.set(S.rom.bytes,before);
+    out.set(S.cia.bytes.subarray(after),before+S.rom.bytes.length);
+    logln('ok','[BUILD] '+fsz(out.length));
+    setStep(3,'done');
 
-    // Download
-    S.outputBlob=new Blob([result.data],{type:'application/octet-stream'});
-    document.getElementById('dlBtn').onclick=()=>{
-      const url=URL.createObjectURL(S.outputBlob);
-      const a=document.createElement('a'); a.href=url; a.download=fname; a.click();
-      setTimeout(()=>URL.revokeObjectURL(url),2000);
-    };
-
-    log('ok','[DONE] ✓ Iniezione completata! CIA pronto per installazione su N3DS CFW.');
-    log('dim','[HELP] Usa FBI Manager o GodMode9 per installare il .CIA sul tuo 3DS.');
-
-  } catch(err){
-    log('err','[ERR]  '+err.message);
-    setProgress(0,'Errore durante la conversione');
-    for(let i=0;i<7;i++){
-      const el=document.getElementById('s'+i);
-      if(el.className.includes('active')) el.className='si';
+    setStep(4,'active');setPrg(60,'NCCH headers...');
+    await sleep(110);
+    const diff=S.rom.bytes.length-origSz;
+    const newCS=Number(ci.contentSize)+diff;
+    setU64(out,0x18,newCS);
+    if(ci.hasNCCH){
+      const nb=ci.off.content;
+      const oS=u32(out,nb+4),nS=Math.max(1,oS+Math.ceil(diff/0x200));setU32(out,nb+4,nS);
+      const oR=u32(out,nb+0x1A8),nR=Math.max(0,oR+Math.ceil(diff/0x200));setU32(out,nb+0x1A8,nR);
+      logln('ok','[NCCH] '+oS+'->'+nS+' MU / RomFS: '+oR+'->'+nR+' MU');
     }
+    setStep(4,'done');
+
+    setStep(5,'active');setPrg(75,'SHA-256 TMD...');
+    await sleep(120);
+    const tmd=ci.tmdP;
+    if(tmd&&tmd.chunks.length>0){
+      const cD=out.subarray(ci.off.content,ci.off.content+newCS);
+      const cH=await sha256(cD);
+      logln('dim','[SHA2] '+hex(cH,8)+'...');
+      setU64(out,ci.off.tmd+tmd.cro+8,newCS);
+      out.set(cH,tmd.chunks[0].hashAbsOff);
+      logln('ok','[TMD]  Chunk hash aggiornato');
+      const cr=out.subarray(ci.off.tmd+tmd.cro,ci.off.tmd+tmd.cro+tmd.cc*0x30);
+      const crH=await sha256(cr);out.set(crH,ci.off.tmd+tmd.iro+4);
+      const ir=out.subarray(ci.off.tmd+tmd.iro,ci.off.tmd+tmd.iro+64*36);
+      const irH=await sha256(ir);out.set(irH,tmd.ihoAbs);
+      logln('ok','[TMD]  Info hash aggiornato');
+    }else{logln('warn','[TMD]  Struttura non standard');}
+    setStep(5,'done');
+
+    setStep(6,'active');setPrg(93,'Verifica finale...');
+    await sleep(200);
+    const fH=await sha256(out);
+    const hx=hex(fH,16);
+    logln('ok','[HASH] '+hx.toUpperCase());
+    logln('ok','[OUT]  '+fsz(out.length));
+    logln('ok','[DONE] CIA pronto per installazione!');
+    logln('dim','[HELP] Installa con FBI o GodMode9 su N3DS + Luma3DS + sigpatches');
+    setStep(6,'done');setPrg(100,'Completato!');
+
+    const safe=title.replace(/[^a-zA-Z0-9_\-]/g,'_');
+    const fname=safe+'.cia';
+    document.getElementById('outName').textContent=fname;
+    document.getElementById('outSize').textContent=fsz(out.length);
+    document.getElementById('outHash').textContent=hx.toUpperCase();
+    document.getElementById('outCard').classList.add('on');
+    S.outputBlob=new Blob([out],{type:'application/octet-stream'});
+    const dl=document.getElementById('dlBtn');dl.classList.add('on');
+    dl.onclick=()=>{
+      const url=URL.createObjectURL(S.outputBlob);
+      const a=document.createElement('a');a.href=url;a.download=fname;a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),3000);
+      toast('Download: '+fname,'ok');
+    };
+    toast('Iniezione completata!','ok');
+  }catch(err){
+    logln('err','[ERR] '+err.message);
+    setPrg(0,'Errore');
+    document.getElementById('hprog').classList.remove('on');
+    toast('Errore: '+err.message.slice(0,50),'err');
   }
-  
-  S.busy=false;
-  document.getElementById('convertBtn').disabled=false;
+  S.busy=false;document.getElementById('convertBtn').disabled=false;
 });
 
-// ── RESET ──────────────────────────────────────────
+// ── RESET (solo ROM, VC base rimane in cache)
 document.getElementById('resetBtn').addEventListener('click',()=>{
-  S.romBytes=S.romFile=S.ciaBytes=S.ciaFile=S.outputBlob=S.iconBlob=null;
-  S.romInfo={}; S.ciaInfo={};
-  
-  ['dz-rom','dz-cia'].forEach(id=>{
-    const dz=document.getElementById(id);
-    dz.classList.remove('ready','over','err');
-  });
-  document.getElementById('romDzTitle').textContent='TRASCINA IL ROM GBA QUI';
-  document.getElementById('ciaDzTitle').textContent='📂 CARICA VC BASE CIA';
-  document.getElementById('romInfo').innerHTML='';
-  document.getElementById('romInfo').classList.remove('show');
-  document.getElementById('ciaInfo').style.display='none';
-  document.getElementById('log').innerHTML='';
-  document.getElementById('log').classList.remove('show');
-  document.getElementById('pgw').classList.remove('show');
-  document.getElementById('stepsList').style.display='none';
-  document.getElementById('outCard').classList.remove('show');
+  S.rom={bytes:null,file:null,info:null};S.outputBlob=null;S.icon=null;
+  document.getElementById('dzRom').classList.remove('ok','over');
+  document.getElementById('romLabel').textContent='TRASCINA IL ROM GBA QUI';
+  document.getElementById('romTbl').innerHTML='';document.getElementById('romTbl').classList.remove('on');
+  document.getElementById('log').innerHTML='';document.getElementById('log').classList.remove('on');
+  document.getElementById('prgW').classList.remove('on');
+  document.getElementById('stepsEl').classList.remove('on');
+  document.getElementById('outCard').classList.remove('on');
+  document.getElementById('dlBtn').classList.remove('on');
+  document.getElementById('hprog').classList.remove('on');
   document.getElementById('convertBtn').disabled=true;
   document.getElementById('romFile').value='';
-  document.getElementById('ciaFile').value='';
   document.getElementById('gameTitle').value='';
   document.getElementById('gamePublisher').value='';
+  document.getElementById('gameDesc').value='';
   document.getElementById('iconPrev').innerHTML='NO<br>IMG';
-  document.getElementById('bnrIcon').innerHTML='ICON';
-  ['sSize','sCode','sChk','sReg'].forEach(id=>document.getElementById(id).textContent='—');
-  document.getElementById('ciaSideInfo').textContent='Nessun CIA caricato.';
-  updateBanner();
+  document.getElementById('bnrIco').innerHTML='ICON';
+  ['stSize','stCode','stChk','stReg'].forEach(id=>document.getElementById(id).textContent='-');
+  document.getElementById('romBadge').innerHTML='';
+  updateBanner();toast('Reset eseguito — VC Base mantenuto in cache','ok');
 });
 
-// ── UTILS ──────────────────────────────────────────
-function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-
-// Panel focus glow
-document.querySelectorAll('input,select,textarea').forEach(el=>{
-  el.addEventListener('focus',()=>{
-    const p=el.closest('.panel'); if(p) p.classList.add('lit');
-  });
-  el.addEventListener('blur',()=>{
-    const p=el.closest('.panel'); if(p) p.classList.remove('lit');
-  });
-});
+// ── INIT: scarica VC Base automaticamente dalla repo
+(async()=>{
+  try{
+    const bytes = await fetchVcBase();
+    const info = parseCIA(bytes);
+    S.cia.bytes=bytes;
+    S.cia.file={name:'conv.cia',size:bytes.length};
+    S.cia.info=info;
+    renderCiaInfo(info,'conv.cia');
+    setVcStatus('ok','VC Base pronto','conv.cia · '+fsz(bytes.length)+' · caricato da repo');
+    document.getElementById('vcBadge').innerHTML='<span class="badge bg" style="font-size:7px;">OK</span>';
+    checkReady();
+    console.log('[NSUI] conv.cia caricato OK:',fsz(bytes.length));
+  }catch(err){
+    console.error('[NSUI] Errore caricamento VC Base:',err);
+    setVcStatus('err','Errore download VC Base',err.message);
+    document.getElementById('vcBadge').innerHTML='<span class="badge ba" style="font-size:7px;">ERR</span>';
+    // Mostra messaggio di retry
+    const box=document.getElementById('vcStatusBox');
+    const retryBtn=document.createElement('button');
+    retryBtn.textContent='Riprova';
+    retryBtn.style.cssText='font-family:var(--mono);font-size:8px;padding:4px 10px;background:rgba(0,0,0,.4);border:1px solid rgba(255,51,85,.3);border-radius:3px;color:var(--red);cursor:pointer;margin-top:8px;';
+    retryBtn.onclick=()=>location.reload();
+    box.parentNode.appendChild(retryBtn);
+  }
+})();
 </script>
 </body>
 </html>
