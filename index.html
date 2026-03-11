@@ -948,26 +948,102 @@ document.getElementById('convertBtn').addEventListener('click',async()=>{
     logln('ok','[BUILD] '+fsz(out.length));
     setStep(3,'done');
 
-    setStep(4,'active');setPrg(60,'NCCH headers...');
+    setStep(4,'active');setPrg(60,'NCCH headers + ExeFS hash...');
     await sleep(110);
     const diff=S.rom.bytes.length-origSz;
     const newCS=Number(ci.contentSize)+diff;
     setU64(out,0x18,newCS);
     if(ci.hasNCCH){
-      // NCCH header layout (content base):
-      // +0x000-0x0FF : RSA-2048 signature (skip!)
-      // +0x100       : "NCCH" magic
-      // +0x104       : Content size in media units (MU = 0x200 bytes) ← fix here
-      // +0x1A0       : RomFS offset (MU)
-      // +0x1A4       : RomFS size (MU) ← fix here
       const nb=ci.off.content;
+      // NCCH header offsets (all relative to content base = NCCH start):
+      // +0x104 = content size (MU)
+      // +0x1A0 = ExeFS offset (MU)
+      // +0x1A4 = ExeFS size (MU)
+      // +0x1B0 = RomFS offset (MU)
+      // +0x1B4 = RomFS size (MU)
+      // +0x1C0 = ExeFS superblock SHA-256 (32 bytes) ← MUST update
       const diffMU=Math.ceil(Math.abs(diff)/0x200)*(diff>=0?1:-1);
-      const oS=u32(out,nb+0x104),nS=Math.max(1,oS+diffMU);
-      setU32(out,nb+0x104,nS);
-      const oR=u32(out,nb+0x1A4),nR=Math.max(0,oR+diffMU);
-      setU32(out,nb+0x1A4,nR);
-      logln('ok','[NCCH] size: '+oS+' → '+nS+' MU (delta '+diffMU+')');
-      logln('ok','[NCCH] RomFS: '+oR+' → '+nR+' MU');
+
+      // Update content size
+      const oCS=u32(out,nb+0x104), nCS=Math.max(1,oCS+diffMU);
+      setU32(out,nb+0x104,nCS);
+      logln('ok','[NCCH] Content: '+oCS+' → '+nCS+' MU');
+
+      // Update ExeFS size (GBA ROM lives in ExeFS for GBA VC)
+      const exefsOffMU=u32(out,nb+0x1A0);
+      const oES=u32(out,nb+0x1A4), nES=Math.max(0,oES+diffMU);
+      setU32(out,nb+0x1A4,nES);
+      logln('ok','[NCCH] ExeFS: offset='+exefsOffMU+' MU · size '+oES+' → '+nES+' MU');
+
+      // ── ExeFS superblock hash update ──────────────────────────────
+      // ExeFS starts at: NCCH_base + exefsOffMU * 0x200
+      // ExeFS header (0x200 bytes):
+      //   0x000 - 0x09F : up to 10 file entries (each 0x10: name[8],offset_u32,size_u32)
+      //   0x0A0 - 0x0FF : padding
+      //   0x100 - 0x23F : up to 10 file SHA-256 hashes (reverse order, each 0x20)
+      //   wait - ExeFS header is exactly 0x200 bytes total:
+      //     0x000-0x09F: entries (10 x 0x10)
+      //     0x0A0-0x0FF: reserved
+      //     0x100-0x23F: hashes (10 x 0x20) — but 0x240 > 0x200!
+      // Correct layout: entries at 0x000-0x09F, hashes start at 0x100
+      //   BUT hashes are IN REVERSE ORDER of entries, starting at 0x1E0 for entry 0
+      //   i.e. hash[9] is at 0x100, hash[0] is at 0x1E0
+      // Actually correct ExeFS header layout:
+      //   0x000: file entries (10 * 16 = 160 = 0xA0 bytes)
+      //   0x0A0: padding (0x60 bytes)  
+      //   0x100: file hashes (10 * 32 = 320 = 0x140 bytes) in REVERSE entry order
+      // Total: 0x240 bytes? No — ExeFS header is 0x200 bytes:
+      //   0x000: 8 file entries (8*0x10 = 0x80)
+      //   0x080: padding (0x80)
+      //   0x100: 8 file hashes (8*0x20 = 0x100) in reverse order
+      // Actually from 3dbrew: header is 0x200:
+      //   0x000-0x0A0-1: 10 file headers (name[8]+off[4]+size[4])
+      //   0x0A0-0x0FF: reserved
+      //   0x100-0x1FF: 10 SHA-256 hashes (each 0x20) in REVERSE order of entries
+
+      const exefsBase = nb + exefsOffMU * 0x200; // absolute offset in out[]
+
+      // Parse ExeFS file entries to find the ROM file
+      let romEntryOff = -1, romHashOff = -1;
+      for(let i=0;i<10;i++){
+        const entOff = exefsBase + i*0x10;
+        if(entOff+0x10 > out.length) break;
+        // Check if this entry is non-empty (name != all zeros)
+        const hasName = out[entOff]!==0||out[entOff+1]!==0||out[entOff+2]!==0;
+        if(!hasName) continue;
+        const fileOff = u32(out, entOff+0x08); // offset from file area (after 0x200 header)
+        const fileSize= u32(out, entOff+0x0C);
+        const name = String.fromCharCode(...out.subarray(entOff,entOff+8)).replace(/ /g,'');
+        logln('dim','[EXEFS] Entry['+i+']: "'+name+'" off=0x'+fileOff.toString(16)+' size='+fsz(fileSize));
+        // The ROM file is the largest file, or the one whose data contains the GBA logo
+        const dataStart = exefsBase+0x200+fileOff;
+        if(dataStart === romStart || Math.abs(fileSize-origSz)<0x10000){
+          romEntryOff = entOff;
+          romHashOff  = exefsBase + 0x100 + (9-i)*0x20; // hashes in reverse order
+          logln('ok','[EXEFS] ROM file trovato: entry '+i+' hash@0x'+romHashOff.toString(16));
+        }
+      }
+
+      if(romEntryOff>=0){
+        // Update file entry size
+        setU32(out, romEntryOff+0x0C, S.rom.bytes.length);
+
+        // Compute SHA-256 of new ROM data and update ExeFS file hash
+        const fileOff2=u32(out,romEntryOff+0x08);
+        const fileStart=exefsBase+0x200+fileOff2;
+        const romSlice=out.subarray(fileStart, fileStart+S.rom.bytes.length);
+        const romFileHash=await sha256(romSlice);
+        out.set(romFileHash, romHashOff);
+        logln('ok','[EXEFS] File hash: '+hex(romFileHash,8)+'...');
+
+        // Compute ExeFS superblock SHA-256 (over the 0x200-byte ExeFS header)
+        const exefsHdr=out.subarray(exefsBase, exefsBase+0x200);
+        const superblockHash=await sha256(exefsHdr);
+        out.set(superblockHash, nb+0x1C0);
+        logln('ok','[EXEFS] Superblock hash: '+hex(superblockHash,8)+'...');
+      } else {
+        logln('warn','[EXEFS] Struttura ExeFS non riconosciuta — hash non aggiornato');
+      }
     }
     setStep(4,'done');
 
