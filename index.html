@@ -954,10 +954,20 @@ document.getElementById('convertBtn').addEventListener('click',async()=>{
     const newCS=Number(ci.contentSize)+diff;
     setU64(out,0x18,newCS);
     if(ci.hasNCCH){
+      // NCCH header layout (content base):
+      // +0x000-0x0FF : RSA-2048 signature (skip!)
+      // +0x100       : "NCCH" magic
+      // +0x104       : Content size in media units (MU = 0x200 bytes) ← fix here
+      // +0x1A0       : RomFS offset (MU)
+      // +0x1A4       : RomFS size (MU) ← fix here
       const nb=ci.off.content;
-      const oS=u32(out,nb+4),nS=Math.max(1,oS+Math.ceil(diff/0x200));setU32(out,nb+4,nS);
-      const oR=u32(out,nb+0x1A8),nR=Math.max(0,oR+Math.ceil(diff/0x200));setU32(out,nb+0x1A8,nR);
-      logln('ok','[NCCH] '+oS+'->'+nS+' MU / RomFS: '+oR+'->'+nR+' MU');
+      const diffMU=Math.ceil(Math.abs(diff)/0x200)*(diff>=0?1:-1);
+      const oS=u32(out,nb+0x104),nS=Math.max(1,oS+diffMU);
+      setU32(out,nb+0x104,nS);
+      const oR=u32(out,nb+0x1A4),nR=Math.max(0,oR+diffMU);
+      setU32(out,nb+0x1A4,nR);
+      logln('ok','[NCCH] size: '+oS+' → '+nS+' MU (delta '+diffMU+')');
+      logln('ok','[NCCH] RomFS: '+oR+' → '+nR+' MU');
     }
     setStep(4,'done');
 
