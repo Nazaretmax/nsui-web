@@ -943,15 +943,12 @@ document.getElementById('convertBtn').addEventListener('click', async()=>{
     setPrg(12,'Esecuzione Python...');
 
     // ── Run Python injection (exact same code that works)
-    const result = await pyodide.runPythonAsync(`
-import struct, hashlib, js
+    await pyodide.runPythonAsync(`
+import struct, hashlib
 
-# Get bytes from JS
 cia = bytearray(cia_bytes.to_py())
 rom = bytes(rom_bytes.to_py())
-
-logs = []
-def log(msg): logs.append(msg)
+py_logs = []
 
 def u32le(b,o): return struct.unpack_from('<I',b,o)[0]
 def u32be(b,o): return struct.unpack_from('>I',b,o)[0]
@@ -960,104 +957,79 @@ def align(v,a): return v if v%a==0 else v+(a-v%a)
 def setU32(b,o,v): struct.pack_into('<I',b,o,v)
 def setU64(b,o,v): struct.pack_into('<Q',b,o,v)
 
-# ── Parse CIA
 hdr_size=u32le(cia,0); cert_size=u32le(cia,8)
 ticket_size=u32le(cia,0xC); tmd_size=u32le(cia,0x10)
 off_cert=align(hdr_size,64); off_ticket=align(off_cert+cert_size,64)
 off_tmd=align(off_ticket+ticket_size,64); off_content=align(off_tmd+tmd_size,64)
 content_size=u64le(cia,0x18)
-log(f'[STEP1] CIA header OK · content @ 0x{off_content:X}')
-
-assert cia[off_content+0x100:off_content+0x104]==b'NCCH', 'NCCH magic non trovato'
 nb=off_content
-log('[STEP1] NCCH trovato')
+assert cia[nb+0x100:nb+0x104]==b'NCCH', 'NCCH magic non trovato'
+py_logs.append(f'[STEP1] CIA OK · content @ 0x{off_content:X}')
 
-# ── Find ExeFS and .code entry
 exefs_off_mu=u32le(cia,nb+0x1A0)
 exefs_base=nb+exefs_off_mu*0x200
 exefs_data=exefs_base+0x200
-log(f'[STEP2] ExeFS @ 0x{exefs_base:X}')
+py_logs.append(f'[STEP2] ExeFS @ 0x{exefs_base:X}')
 
 code_entry=None
 for i in range(10):
     eo=exefs_base+i*0x10
-    name=bytes(cia[eo:eo+8]).rstrip(b'\\x00').decode('ascii','replace')
+    name=bytes(cia[eo:eo+8]).rstrip(b'\x00').decode('ascii','replace')
     if not name: continue
     foff=u32le(cia,eo+8); fsize=u32le(cia,eo+0xC)
     fabs=exefs_data+foff
     hash_off=exefs_base+0x1E0-i*0x20
-    log(f'[STEP2] [{i}] "{name}" {fsize:,}B @ 0x{fabs:X}')
+    py_logs.append(f'[STEP2] [{i}] "{name}" {fsize:,}B')
     if name.startswith('.code'):
         code_entry={'eo':eo,'foff':foff,'fsize':fsize,'fabs':fabs,'hash_off':hash_off,'idx':i}
 
-assert code_entry is not None, '.code non trovato nel CIA. Usa un CIA VC GBA valido.'
+assert code_entry is not None, '.code non trovato. Usa un CIA VC GBA valido.'
 
-# Verify GBA logo
-GBA_LOGO = bytes([0x24,0xFF,0xAE,0x51,0x69,0x9A,0xA2,0x21,0x3D,0x84,0x82,0x0A,
-                  0x84,0xE4,0x09,0xAD,0x11,0x24,0x8B,0x98,0xC0,0x81,0x7F,0x21,
-                  0xA3,0x52,0xBE,0x19,0x93,0x09,0xCE,0x20])
-logo_pos=bytes(cia).find(GBA_LOGO, code_entry['fabs'])
-assert logo_pos>=0, 'GBA Logo non trovato. CIA non e un GBA VC valido.'
-log(f'[STEP2] GBA Logo @ 0x{logo_pos:X}')
+GBA_LOGO=bytes([0x24,0xFF,0xAE,0x51,0x69,0x9A,0xA2,0x21,0x3D,0x84,0x82,0x0A,
+                0x84,0xE4,0x09,0xAD,0x11,0x24,0x8B,0x98,0xC0,0x81,0x7F,0x21,
+                0xA3,0x52,0xBE,0x19,0x93,0x09,0xCE,0x20])
+assert bytes(cia).find(GBA_LOGO,code_entry['fabs'])>=0, 'GBA Logo non trovato. CIA non e GBA VC valido.'
+py_logs.append(f'[STEP3] ROM={len(rom):,}B Footer={max(0,code_entry["fsize"]-len(rom))}B')
 
-footer=max(0, code_entry['fsize']-len(rom))
-log(f'[STEP3] ROM={len(rom):,}B  Footer VC={footer}B')
+cia[code_entry['fabs']:code_entry['fabs']+len(rom)]=rom
+footer=max(0,code_entry['fsize']-len(rom))
+orig_rom=code_entry['fsize']-footer
+if len(rom)<orig_rom:
+    cia[code_entry['fabs']+len(rom):code_entry['fabs']+orig_rom]=b'\xff'*(orig_rom-len(rom))
+py_logs.append('[STEP3] Iniezione OK')
 
-# ── Step 3: Inject ROM (keep footer intact)
-cia[code_entry['fabs']:code_entry['fabs']+len(rom)] = rom
-orig_rom_in_code = code_entry['fsize'] - footer
-if len(rom) < orig_rom_in_code:
-    cia[code_entry['fabs']+len(rom):code_entry['fabs']+orig_rom_in_code] = b'\\xff'*(orig_rom_in_code-len(rom))
-log(f'[STEP3] Iniezione OK · CIA size={len(cia):,}B')
-
-# ── Step 4: ExeFS hashes
 code_data=bytes(cia[code_entry['fabs']:code_entry['fabs']+code_entry['fsize']])
 new_code_hash=hashlib.sha256(code_data).digest()
 cia[code_entry['hash_off']:code_entry['hash_off']+32]=new_code_hash
-log(f'[STEP4] .code hash: {new_code_hash.hex()[:16]}...')
+py_logs.append(f'[STEP4] .code hash: {new_code_hash.hex()[:16]}...')
 
-exefs_hdr=bytes(cia[exefs_base:exefs_base+0x200])
-new_sb=hashlib.sha256(exefs_hdr).digest()
+new_sb=hashlib.sha256(bytes(cia[exefs_base:exefs_base+0x200])).digest()
 cia[nb+0x1C0:nb+0x1E0]=new_sb
-log(f'[STEP4] ExeFS SB: {new_sb.hex()[:16]}...')
+py_logs.append(f'[STEP4] ExeFS SB: {new_sb.hex()[:16]}...')
 
-# ── Step 5/6: TMD hashes
 sig_type=u32be(cia,off_tmd)
 sig_len={0x10003:0x100,0x10004:0x100,0x10005:0x3C}.get(sig_type,0x100)
 sd_off=((4+sig_len+63)//64)*64
 cc=(cia[off_tmd+sd_off+0x9E]<<8)|cia[off_tmd+sd_off+0x9F]
 iro_abs=off_tmd+sd_off+0xC4
 cro_abs=iro_abs+64*36
+new_ch=hashlib.sha256(bytes(cia[off_content:off_content+content_size])).digest()
+cia[cro_abs+0x10:cro_abs+0x30]=new_ch
+cia[iro_abs+4:iro_abs+36]=hashlib.sha256(bytes(cia[cro_abs:cro_abs+cc*0x30])).digest()
+cia[off_tmd+sd_off+0xA4:off_tmd+sd_off+0xA4+32]=hashlib.sha256(bytes(cia[iro_abs:iro_abs+64*36])).digest()
+py_logs.append(f'[STEP6] TMD hash: {new_ch.hex()[:16].upper()}...')
+py_logs.append(f'[DONE] OK · {len(cia):,}B')
 
-content_data=bytes(cia[off_content:off_content+content_size])
-new_content_hash=hashlib.sha256(content_data).digest()
-cia[cro_abs+0x10:cro_abs+0x30]=new_content_hash
-
-chunk_data=bytes(cia[cro_abs:cro_abs+cc*0x30])
-cia[iro_abs+4:iro_abs+36]=hashlib.sha256(chunk_data).digest()
-
-info_data=bytes(cia[iro_abs:iro_abs+64*36])
-cia[off_tmd+sd_off+0xA4:off_tmd+sd_off+0xA4+32]=hashlib.sha256(info_data).digest()
-log(f'[STEP6] TMD hash: {new_content_hash.hex()[:16]}...')
-
-# ── Final verify
-v_code=hashlib.sha256(bytes(cia[code_entry['fabs']:code_entry['fabs']+code_entry['fsize']])).digest()
-v_sb=hashlib.sha256(bytes(cia[exefs_base:exefs_base+0x200])).digest()
-v_content=hashlib.sha256(bytes(cia[off_content:off_content+content_size])).digest()
-assert v_code==new_code_hash, 'VERIFY .code hash FAIL'
-assert v_sb==bytes(cia[nb+0x1C0:nb+0x1E0]), 'VERIFY SB FAIL'
-assert v_content==bytes(cia[cro_abs+0x10:cro_abs+0x30]), 'VERIFY TMD FAIL'
-log(f'[DONE] Verifica OK · {len(cia):,}B · {new_content_hash.hex()[:16].upper()}...')
-
-{'cia': bytes(cia), 'logs': logs, 'size': len(cia), 'hash': new_content_hash.hex().upper()}
+py_cia_out = bytes(cia)
+py_hash_out = new_ch.hex().upper()
 `);
 
-    // Parse Python result — Pyodide returns a Map, convert to plain JS object
-    const pyMap = result.toJs ? result.toJs() : result;
-    const outBytes = new Uint8Array(pyMap.get('cia'));
-    const pyLogs   = Array.from(pyMap.get('logs'));
-    const outHash  = pyMap.get('hash');
+    // Read results from Python globals
+    const outBytes = new Uint8Array(pyodide.globals.get('py_cia_out').toJs());
+    const pyLogs   = pyodide.globals.get('py_logs').toJs();
+    const outHash  = pyodide.globals.get('py_hash_out');
 
+    // Show Python logs in our UI
     // Show Python logs in our UI
     setStep(0,'done'); setStep(1,'done'); setPrg(30,'ROM iniettata...');
     for(const l of pyLogs){
