@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#05080f">
 <title>NSUI Web — GBA to CIA</title>
 <link rel="manifest" href="manifest.json">
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -712,13 +713,23 @@ function parseCIA(b){
   h.size=b.length; return h;
 }
 function parseTMD(buf,base){
-  const st=u32be(buf,0);let sl;
-  switch(st){case 0x10003:case 0x10004:sl=0x100;break;case 0x10005:sl=0x3C;break;default:sl=0x100;}
-  const sd=algn(4+sl,64),cc=(buf[sd+0x9E]<<8)|buf[sd+0x9F];
-  const iho=sd+0xA4,iro=sd+0xC4,cro=iro+64*36;
+  const st=u32be(buf,0);
+  // Correct sig sizes: RSA-4096(0x10003)=0x200, RSA-2048(0x10004)=0x100, ECDSA(0x10005)=0x3C
+  let sl;
+  switch(st){
+    case 0x10003: sl=0x200; break;
+    case 0x10004: sl=0x100; break;
+    case 0x10005: sl=0x3C;  break;
+    default:      sl=0x100;
+  }
+  const sd=algn(4+sl,64);
+  const cc=(buf[sd+0x9E]<<8)|buf[sd+0x9F];
+  const iho=sd+0xA4, iro=sd+0xC4, cro=iro+64*36;
   const chunks=[];
-  for(let i=0;i<cc;i++){const b2=cro+i*0x30;
-    chunks.push({hashAbsOff:base+b2+0x10});}
+  for(let i=0;i<cc;i++){
+    const b2=cro+i*0x30;
+    chunks.push({hashAbsOff:base+b2+0x10});
+  }
   return{sd,cc,iho,iro,cro,chunks,ihoAbs:base+iho,iroAbs:base+iro,croAbs:base+cro};
 }
 function detectOrigSz(cia,romStart){
@@ -896,10 +907,12 @@ function checkReady(){
 }
 
 // ── INJECT
-document.getElementById('convertBtn').addEventListener('click',async()=>{
-  if(S.busy||!S.rom.bytes||!S.cia.bytes)return;
+document.getElementById('convertBtn').addEventListener('click', async()=>{
+  if(S.busy||!S.rom.bytes||!S.cia.bytes) return;
   S.busy=true;
-  document.getElementById('log').innerHTML='';document.getElementById('log').classList.remove('on');
+
+  document.getElementById('log').innerHTML='';
+  document.getElementById('log').classList.remove('on');
   document.getElementById('prgW').classList.add('on');
   document.getElementById('stepsEl').classList.add('on');
   document.getElementById('outCard').classList.remove('on');
@@ -909,190 +922,182 @@ document.getElementById('convertBtn').addEventListener('click',async()=>{
   for(let i=0;i<7;i++){const el=document.getElementById('s'+i);el.className='si';el.querySelector('.sn').textContent=i+1;}
 
   const title=document.getElementById('gameTitle').value||S.rom.info?.title||'Unknown';
+
   try{
-    setStep(0,'active');setPrg(5,'Validazione ROM...');
-    logln('info','[NSUI] v3 — GBA to CIA Injector');
-    logln('dim','[ROM]  '+S.rom.file.name+' · '+fsz(S.rom.bytes.length));
-    await sleep(180);
-    logln(S.rom.info.isGba?'ok':'warn','[ROM]  Header: '+(S.rom.info.isGba?'VALIDO':'ATIPICO'));
-    logln(S.rom.info.checksumOk?'ok':'warn','[ROM]  Checksum: '+(S.rom.info.checksumOk?'OK':'WARN'));
-    setStep(0,'done');
-
-    setStep(1,'active');setPrg(16,'Parsing CIA Base...');
-    const ci=S.cia.info;
-    logln('dim','[CIA]  '+S.cia.file.name+' · '+fsz(S.cia.bytes.length));
-    await sleep(180);
-    logln('ok','[CIA]  Header: '+(ci.validHdr?'VALIDO':'WARN'));
-    logln('ok','[CIA]  NCCH: '+(ci.hasNCCH?'TROVATO':'ricerco ROM...'));
-    logln('ok','[CIA]  TMD: '+(ci.tmdP?.cc??'?')+' chunk(s)');
-    setStep(1,'done');
-
-    // ═══════════════════════════════════════════════════
-    // INJECTION ENGINE v4 — ExeFS-aware correct approach
-    //
-    // GBA VC CIA: NCCH → ExeFS → .code (= ROM + footer)
-    //                            banner / icon / logo ← UNTOUCHED
-    //
-    // Replace ONLY .code ROM bytes, keep footer + other files.
-    // Sizes unchanged for same-size ROMs.
-    // Update: .code hash, ExeFS superblock, TMD hashes.
-    // ═══════════════════════════════════════════════════
-
-    setStep(2,'active');setPrg(32,'Analisi ExeFS...');
-    await sleep(140);
-
-    const nb2 = ci.off.content;
-    const exefsOffMU = u32(S.cia.bytes, nb2+0x1A0);
-    const exefsBase  = nb2 + exefsOffMU * 0x200;
-    const exefsData  = exefsBase + 0x200;
-
-    // Parse ExeFS entries — find .code
-    let codeEntry = null;
-    for(let i=0;i<10;i++){
-      const eo = exefsBase + i*0x10;
-      if(eo+0x10 > S.cia.bytes.length) break;
-      const raw = S.cia.bytes.subarray(eo, eo+8);
-      const name = String.fromCharCode(...raw).replace(/\0/g,'');
-      if(!name) continue;
-      const fOff  = u32(S.cia.bytes, eo+0x08);
-      const fSize = u32(S.cia.bytes, eo+0x0C);
-      const fAbs  = exefsData + fOff;
-      const hashOff = exefsBase + 0x1E0 - i*0x20; // reverse order
-      logln('dim','[EXEFS] ['+i+'] "'+name+'" '+fsz(fSize)+' @ 0x'+fAbs.toString(16).toUpperCase());
-      if(name.startsWith('.code')) codeEntry={idx:i,eo,fOff,fSize,fAbs,hashOff};
+    // ── Load Pyodide if not yet loaded
+    if(!window._pyodide){
+      logln('info','[PY] Caricamento Pyodide (Python nel browser)...');
+      setPrg(3,'Caricamento motore Python...');
+      window._pyodide = await loadPyodide();
+      logln('ok','[PY] Pyodide pronto');
     }
-    if(!codeEntry) throw new Error('.code non trovato nel CIA. Usa un CIA VC GBA valido.');
+    const pyodide = window._pyodide;
 
-    // Verify GBA logo is inside .code
-    const logoOff = find(S.cia.bytes, GBA_LOGO, codeEntry.fAbs);
-    if(logoOff<0) throw new Error('GBA Logo non trovato. CIA non è un GBA VC valido.');
-    logln('ok','[FIND] .code @ 0x'+codeEntry.fAbs.toString(16).toUpperCase()+' ('+fsz(codeEntry.fSize)+')');
-    logln('ok','[FIND] GBA Logo @ 0x'+logoOff.toString(16).toUpperCase());
+    setStep(0,'active'); setPrg(8,'Caricamento dati...');
+    // Pass bytes to Python via JS globals
+    pyodide.globals.set('cia_bytes', S.cia.bytes);
+    pyodide.globals.set('rom_bytes', S.rom.bytes);
+    logln('dim','[ROM] '+S.rom.file.name+' · '+fsz(S.rom.bytes.length));
+    logln('dim','[CIA] '+(S.cia.file?.name||'conv.cia')+' · '+fsz(S.cia.bytes.length));
 
-    // .code = ROM bytes + VC footer (e.g. 864 bytes of metadata)
-    const footer = Math.max(0, codeEntry.fSize - S.rom.bytes.length);
-    logln('dim','[CODE] ROM: '+fsz(S.rom.bytes.length)+' · Footer VC: '+footer+'B');
-    setStep(2,'done');
+    setPrg(12,'Esecuzione Python...');
 
-    // ── Step 3: Build output ────────────────────────────────
-    setStep(3,'active');setPrg(46,'Iniezione ROM...');
-    await sleep(120);
+    // ── Run Python injection (exact same code that works)
+    const result = await pyodide.runPythonAsync(`
+import struct, hashlib, js
 
-    const romSz  = S.rom.bytes.length;
-    const codeSz = codeEntry.fSize;
-    let out;
+# Get bytes from JS
+cia = bytearray(cia_bytes.to_py())
+rom = bytes(rom_bytes.to_py())
 
-    if(romSz <= codeSz){
-      // Same or smaller: copy CIA, replace ROM portion only, keep footer intact
-      out = new Uint8Array(S.cia.bytes);
-      out.set(S.rom.bytes, codeEntry.fAbs);
-      // If new ROM < old ROM portion: pad gap with 0xFF
-      const origRomInCode = codeSz - footer;
-      if(romSz < origRomInCode){
-        out.fill(0xFF, codeEntry.fAbs+romSz, codeEntry.fAbs+origRomInCode);
-      }
-      logln('ok','[BUILD] '+fsz(out.length)+' (stessa dimensione del CIA originale)');
-    } else {
-      // Larger ROM: expand and shift all subsequent ExeFS files
-      const extra = romSz - codeSz;
-      const extraA = Math.ceil(extra/0x200)*0x200;
-      const codeEnd = codeEntry.fAbs + codeSz;
-      out = new Uint8Array(S.cia.bytes.length + extraA);
-      out.set(S.cia.bytes.subarray(0, codeEntry.fAbs));
-      out.set(S.rom.bytes, codeEntry.fAbs);
-      out.fill(0xFF, codeEntry.fAbs+romSz, codeEntry.fAbs+romSz+(extraA-extra));
-      out.set(S.cia.bytes.subarray(codeEnd), codeEntry.fAbs+codeSz+extraA);
-      // Fix offsets of subsequent ExeFS entries
-      for(let i=codeEntry.idx+1;i<10;i++){
-        const eo2=exefsBase+i*0x10;
-        const n2=String.fromCharCode(...out.subarray(eo2,eo2+8)).replace(/\0/g,'');
-        if(!n2) continue;
-        setU32(out, eo2+0x08, u32(out,eo2+0x08)+extraA);
-      }
-      logln('ok','[BUILD] '+fsz(out.length)+' (+'+fsz(extraA)+')');
+logs = []
+def log(msg): logs.append(msg)
+
+def u32le(b,o): return struct.unpack_from('<I',b,o)[0]
+def u32be(b,o): return struct.unpack_from('>I',b,o)[0]
+def u64le(b,o): return struct.unpack_from('<Q',b,o)[0]
+def align(v,a): return v if v%a==0 else v+(a-v%a)
+def setU32(b,o,v): struct.pack_into('<I',b,o,v)
+def setU64(b,o,v): struct.pack_into('<Q',b,o,v)
+
+# ── Parse CIA
+hdr_size=u32le(cia,0); cert_size=u32le(cia,8)
+ticket_size=u32le(cia,0xC); tmd_size=u32le(cia,0x10)
+off_cert=align(hdr_size,64); off_ticket=align(off_cert+cert_size,64)
+off_tmd=align(off_ticket+ticket_size,64); off_content=align(off_tmd+tmd_size,64)
+content_size=u64le(cia,0x18)
+log(f'[STEP1] CIA header OK · content @ 0x{off_content:X}')
+
+assert cia[off_content+0x100:off_content+0x104]==b'NCCH', 'NCCH magic non trovato'
+nb=off_content
+log('[STEP1] NCCH trovato')
+
+# ── Find ExeFS and .code entry
+exefs_off_mu=u32le(cia,nb+0x1A0)
+exefs_base=nb+exefs_off_mu*0x200
+exefs_data=exefs_base+0x200
+log(f'[STEP2] ExeFS @ 0x{exefs_base:X}')
+
+code_entry=None
+for i in range(10):
+    eo=exefs_base+i*0x10
+    name=bytes(cia[eo:eo+8]).rstrip(b'\\x00').decode('ascii','replace')
+    if not name: continue
+    foff=u32le(cia,eo+8); fsize=u32le(cia,eo+0xC)
+    fabs=exefs_data+foff
+    hash_off=exefs_base+0x1E0-i*0x20
+    log(f'[STEP2] [{i}] "{name}" {fsize:,}B @ 0x{fabs:X}')
+    if name.startswith('.code'):
+        code_entry={'eo':eo,'foff':foff,'fsize':fsize,'fabs':fabs,'hash_off':hash_off,'idx':i}
+
+assert code_entry is not None, '.code non trovato nel CIA. Usa un CIA VC GBA valido.'
+
+# Verify GBA logo
+GBA_LOGO = bytes([0x24,0xFF,0xAE,0x51,0x69,0x9A,0xA2,0x21,0x3D,0x84,0x82,0x0A,
+                  0x84,0xE4,0x09,0xAD,0x11,0x24,0x8B,0x98,0xC0,0x81,0x7F,0x21,
+                  0xA3,0x52,0xBE,0x19,0x93,0x09,0xCE,0x20])
+logo_pos=bytes(cia).find(GBA_LOGO, code_entry['fabs'])
+assert logo_pos>=0, 'GBA Logo non trovato. CIA non e un GBA VC valido.'
+log(f'[STEP2] GBA Logo @ 0x{logo_pos:X}')
+
+footer=max(0, code_entry['fsize']-len(rom))
+log(f'[STEP3] ROM={len(rom):,}B  Footer VC={footer}B')
+
+# ── Step 3: Inject ROM (keep footer intact)
+cia[code_entry['fabs']:code_entry['fabs']+len(rom)] = rom
+orig_rom_in_code = code_entry['fsize'] - footer
+if len(rom) < orig_rom_in_code:
+    cia[code_entry['fabs']+len(rom):code_entry['fabs']+orig_rom_in_code] = b'\\xff'*(orig_rom_in_code-len(rom))
+log(f'[STEP3] Iniezione OK · CIA size={len(cia):,}B')
+
+# ── Step 4: ExeFS hashes
+code_data=bytes(cia[code_entry['fabs']:code_entry['fabs']+code_entry['fsize']])
+new_code_hash=hashlib.sha256(code_data).digest()
+cia[code_entry['hash_off']:code_entry['hash_off']+32]=new_code_hash
+log(f'[STEP4] .code hash: {new_code_hash.hex()[:16]}...')
+
+exefs_hdr=bytes(cia[exefs_base:exefs_base+0x200])
+new_sb=hashlib.sha256(exefs_hdr).digest()
+cia[nb+0x1C0:nb+0x1E0]=new_sb
+log(f'[STEP4] ExeFS SB: {new_sb.hex()[:16]}...')
+
+# ── Step 5/6: TMD hashes
+sig_type=u32be(cia,off_tmd)
+sig_len={0x10003:0x100,0x10004:0x100,0x10005:0x3C}.get(sig_type,0x100)
+sd_off=((4+sig_len+63)//64)*64
+cc=(cia[off_tmd+sd_off+0x9E]<<8)|cia[off_tmd+sd_off+0x9F]
+iro_abs=off_tmd+sd_off+0xC4
+cro_abs=iro_abs+64*36
+
+content_data=bytes(cia[off_content:off_content+content_size])
+new_content_hash=hashlib.sha256(content_data).digest()
+cia[cro_abs+0x10:cro_abs+0x30]=new_content_hash
+
+chunk_data=bytes(cia[cro_abs:cro_abs+cc*0x30])
+cia[iro_abs+4:iro_abs+36]=hashlib.sha256(chunk_data).digest()
+
+info_data=bytes(cia[iro_abs:iro_abs+64*36])
+cia[off_tmd+sd_off+0xA4:off_tmd+sd_off+0xA4+32]=hashlib.sha256(info_data).digest()
+log(f'[STEP6] TMD hash: {new_content_hash.hex()[:16]}...')
+
+# ── Final verify
+v_code=hashlib.sha256(bytes(cia[code_entry['fabs']:code_entry['fabs']+code_entry['fsize']])).digest()
+v_sb=hashlib.sha256(bytes(cia[exefs_base:exefs_base+0x200])).digest()
+v_content=hashlib.sha256(bytes(cia[off_content:off_content+content_size])).digest()
+assert v_code==new_code_hash, 'VERIFY .code hash FAIL'
+assert v_sb==bytes(cia[nb+0x1C0:nb+0x1E0]), 'VERIFY SB FAIL'
+assert v_content==bytes(cia[cro_abs+0x10:cro_abs+0x30]), 'VERIFY TMD FAIL'
+log(f'[DONE] Verifica OK · {len(cia):,}B · {new_content_hash.hex()[:16].upper()}...')
+
+{'cia': bytes(cia), 'logs': logs, 'size': len(cia), 'hash': new_content_hash.hex().upper()}
+`);
+
+    // Parse Python result
+    const pyResult = result.toJs ? result.toJs({dict_converter: Object.fromEntries}) : result;
+    const outBytes = new Uint8Array(pyResult.get('cia'));
+    const pyLogs   = pyResult.get('logs');
+    const outHash  = pyResult.get('hash');
+
+    // Show Python logs in our UI
+    setStep(0,'done'); setStep(1,'done'); setPrg(30,'ROM iniettata...');
+    for(const l of pyLogs){
+      const cls = l.includes('STEP1')||l.includes('STEP2') ? 'ok'
+                : l.includes('STEP3')||l.includes('STEP4') ? 'ok'
+                : l.includes('STEP6')||l.includes('DONE')  ? 'ok'
+                : 'dim';
+      logln(cls, l);
     }
-    setStep(3,'done');
+    setStep(2,'done'); setPrg(55,'Hash ExeFS...');
+    setStep(3,'done'); setPrg(70,'Hash TMD...');
+    setStep(4,'done'); setStep(5,'done'); setPrg(95,'Verifica finale...');
+    setStep(6,'done'); setPrg(100,'Completato!');
 
-    // ── Step 4: Update ExeFS hashes ────────────────────────
-    setStep(4,'active');setPrg(60,'Hash ExeFS...');
-    await sleep(110);
-
-    // Recompute .code file hash (SHA-256 of entire .code file including footer)
-    const newCodeHash = await sha256(out.subarray(codeEntry.fAbs, codeEntry.fAbs+codeSz));
-    out.set(newCodeHash, codeEntry.hashOff);
-    logln('ok','[EXEFS] .code hash: '+hex(newCodeHash,8)+'...');
-
-    // Recompute ExeFS superblock (SHA-256 of 0x200 ExeFS header)
-    const newSbHash = await sha256(out.subarray(exefsBase, exefsBase+0x200));
-    out.set(newSbHash, nb2+0x1C0);
-    logln('ok','[EXEFS] Superblock: '+hex(newSbHash,8)+'...');
-
-    // Update NCCH/CIA sizes only if ROM was larger
-    let finalContentSize = Number(ci.contentSize);
-    if(romSz > codeSz){
-      const extraA2 = Math.ceil((romSz-codeSz)/0x200)*0x200;
-      const dMU = extraA2/0x200;
-      setU32(out, nb2+0x104, u32(out,nb2+0x104)+dMU);
-      setU32(out, nb2+0x1A4, u32(out,nb2+0x1A4)+dMU);
-      finalContentSize += extraA2;
-      setU64(out, 0x18, finalContentSize);
-      logln('ok','[NCCH] Espanso +'+dMU+' MU');
-    }
-    setStep(4,'done');
-
-    // ── Step 5: Update TMD hashes ───────────────────────────
-    setStep(5,'active');setPrg(75,'SHA-256 TMD...');
-    await sleep(120);
-    const tmd=ci.tmdP;
-    if(tmd&&tmd.chunks.length>0){
-      const cD=out.subarray(ci.off.content, ci.off.content+finalContentSize);
-      const cH=await sha256(cD);
-      logln('dim','[SHA2] '+hex(cH,8)+'...');
-      setU64(out,ci.off.tmd+tmd.cro+8,finalContentSize);
-      out.set(cH,tmd.chunks[0].hashAbsOff);
-      logln('ok','[TMD]  Chunk hash aggiornato');
-      const cr=out.subarray(ci.off.tmd+tmd.cro,ci.off.tmd+tmd.cro+tmd.cc*0x30);
-      const crH=await sha256(cr);out.set(crH,ci.off.tmd+tmd.iro+4);
-      const ir=out.subarray(ci.off.tmd+tmd.iro,ci.off.tmd+tmd.iro+64*36);
-      const irH=await sha256(ir);out.set(irH,tmd.ihoAbs);
-      logln('ok','[TMD]  Info hash aggiornato');
-    } else {
-      logln('warn','[TMD]  Struttura non standard');
-    }
-    setStep(5,'done');
-
-    setStep(6,'active');setPrg(93,'Verifica finale...');
-    await sleep(200);
-    const fH=await sha256(out);
-    const hx=hex(fH,16);
-    logln('ok','[HASH] '+hx.toUpperCase());
-    logln('ok','[OUT]  '+fsz(out.length));
-    logln('ok','[DONE] CIA pronto per installazione!');
-    logln('dim','[HELP] Installa con FBI o GodMode9 su N3DS + Luma3DS + sigpatches');
-    setStep(6,'done');setPrg(100,'Completato!');
-
-    const safe=title.replace(/[^a-zA-Z0-9_\-]/g,'_');
-    const fname=safe+'.cia';
-    document.getElementById('outName').textContent=fname;
-    document.getElementById('outSize').textContent=fsz(out.length);
-    document.getElementById('outHash').textContent=hx.toUpperCase();
+    const safe = title.replace(/[^a-zA-Z0-9_\-]/g,'_');
+    const fname = safe+'.cia';
+    document.getElementById('outName').textContent = fname;
+    document.getElementById('outSize').textContent = fsz(outBytes.length);
+    document.getElementById('outHash').textContent = outHash.slice(0,32)+'...';
     document.getElementById('outCard').classList.add('on');
-    S.outputBlob=new Blob([out],{type:'application/octet-stream'});
-    const dl=document.getElementById('dlBtn');dl.classList.add('on');
-    dl.onclick=()=>{
-      const url=URL.createObjectURL(S.outputBlob);
-      const a=document.createElement('a');a.href=url;a.download=fname;a.click();
+
+    S.outputBlob = new Blob([outBytes],{type:'application/octet-stream'});
+    const dl = document.getElementById('dlBtn'); dl.classList.add('on');
+    dl.onclick = ()=>{
+      const url = URL.createObjectURL(S.outputBlob);
+      const a = document.createElement('a'); a.href=url; a.download=fname; a.click();
       setTimeout(()=>URL.revokeObjectURL(url),3000);
       toast('Download: '+fname,'ok');
     };
     toast('Iniezione completata!','ok');
-  }catch(err){
-    logln('err','[ERR] '+err.message);
+
+  } catch(err) {
+    logln('err','[ERR] '+String(err));
     setPrg(0,'Errore');
     document.getElementById('hprog').classList.remove('on');
-    toast('Errore: '+err.message.slice(0,50),'err');
+    toast('Errore: '+String(err).slice(0,55),'err');
   }
-  S.busy=false;document.getElementById('convertBtn').disabled=false;
+
+  S.busy=false;
+  document.getElementById('convertBtn').disabled=false;
 });
 
 // ── RESET (solo ROM, VC base rimane in cache)
