@@ -64,7 +64,7 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
 
 /* LAYOUT */
 .app{position:relative;z-index:10;max-width:1140px;margin:0 auto;padding:18px 12px 70px;
-  display:grid;grid-template-columns:1fr 292px;gap:14px;}
+  display:grid;grid-template-columns:1fr 220px;gap:14px;}
 @media(max-width:820px){.app{grid-template-columns:1fr;}.sidebar{order:-1;}}
 .main{display:flex;flex-direction:column;gap:14px;}
 
@@ -262,13 +262,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
 .brow{display:flex;gap:7px;margin-top:9px;}
 
 /* VC BASE BOX */
-.vc-cached{display:none;align-items:center;gap:10px;padding:9px 11px;background:var(--gd);
-  border:1px solid rgba(0,255,136,.25);border-radius:var(--r2);margin-bottom:10px;}
 .vc-cached.on{display:flex;}
-.vc-ico{width:28px;height:28px;border-radius:var(--r2);background:rgba(0,255,136,.15);
-  border:1px solid rgba(0,255,136,.3);display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;font-size:14px;}
-.vc-info{font-family:var(--mono);font-size:8.5px;line-height:1.65;color:var(--green);}
 .vc-info strong{font-size:9.5px;}
 
 /* DZ MINI */
@@ -297,10 +291,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
 .tr{display:flex;justify-content:space-between;align-items:center;padding:5px 6px;
   background:rgba(0,0,0,.28);border-radius:var(--r2);margin-bottom:3px;}
 .tn{font-family:var(--mono);font-size:9px;color:var(--t2);}
-.lnk{font-family:var(--mono);font-size:8.5px;color:var(--cyan);text-decoration:none;padding:5px 6px;
-  background:rgba(0,0,0,.28);border-radius:var(--r2);display:block;transition:background var(--fast);}
-.lnk:hover{background:rgba(0,238,255,.07);}
-.lnk::before{content:'→ ';}
 
 /* TOAST */
 #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(70px);
@@ -497,101 +487,28 @@ details summary{list-style:none;}.details summary::-webkit-details-marker{displa
         <input type="text" id="makerCode" maxlength="4" style="font-family:var(--mono);font-size:10px;"></div>
     </div>
     <div class="div"></div>
-    <div class="alert alert-a">
-      <strong>SIGPATCHES RICHIESTE</strong>
-      CIA usa firma dummy. Luma3DS con sigpatches obbligatorio.
-      Installa con <strong>FBI</strong> o <strong>GodMode9</strong>.
-    </div>
-  </div>
-</div>
 
-<!-- 04 CONVERSIONE -->
-<div class="panel" id="panelConv">
-  <div class="ph"><div class="phn">04</div>CONVERSIONE &amp; OUTPUT</div>
-  <div class="pb">
-    <button class="btn btn-go" id="convertBtn" disabled>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-      AVVIA INIEZIONE CIA
-    </button>
-    <div class="prg" id="prgW">
-      <div class="prg-h"><span id="prgL">Inizializzazione...</span><span id="prgP">0%</span></div>
-      <div class="prg-tr"><div class="prg-fill" id="prgB"></div></div>
-    </div>
-    <div id="log"></div>
-    <div class="steps" id="stepsEl">
-      <div class="si" id="s0"><div class="sn">1</div><div class="stxt">Validazione ROM GBA</div></div>
-      <div class="si" id="s1"><div class="sn">2</div><div class="stxt">Parsing CIA Base (Header/TMD/NCCH)</div></div>
-      <div class="si" id="s2"><div class="sn">3</div><div class="stxt">Localizzazione ROM nel CIA</div></div>
-      <div class="si" id="s3"><div class="sn">4</div><div class="stxt">Iniezione payload ROM</div></div>
-      <div class="si" id="s4"><div class="sn">5</div><div class="stxt">Aggiornamento NCCH headers</div></div>
-      <div class="si" id="s5"><div class="sn">6</div><div class="stxt">Ricalcolo SHA-256 TMD</div></div>
-      <div class="si" id="s6"><div class="sn">7</div><div class="stxt">Assemblaggio CIA finale</div></div>
-    </div>
-    <div class="out" id="outCard">
-      <div class="out-t">CIA PRONTO</div>
-      <div class="out-meta">
-        <div class="om"><span class="omk">FILENAME</span><span class="omv" id="outName">-</span></div>
-        <div class="om"><span class="omk">SIZE</span><span class="omv" id="outSize">-</span></div>
-        <div class="om"><span class="omk">SHA-256</span><span class="omv" id="outHash" style="font-family:var(--mono);font-size:8px;">-</span></div>
-        <div class="om"><span class="omk">FORMAT</span><span class="omv">Nintendo CIA v2</span></div>
-      </div>
-      <button class="btn btn-dl" id="dlBtn">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        SCARICA .CIA
-      </button>
-    </div>
-    <div class="brow">
-      <button class="btn btn-gh" id="resetBtn">RESET ROM</button>
-    </div>
-  </div>
-</div>
 
 </div><!-- /main -->
 
 <div class="sidebar">
   <div class="panel" style="padding:12px;">
     <div class="ph" style="margin:-12px -12px 11px;padding:8px 12px;">
-      <div class="phn">x</div>STATS ROM</div>
+      <div class="phn">◈</div>STATS ROM</div>
     <div class="sg">
-      <div class="stat"><div class="sv" id="stSize">-</div><div class="sk">SIZE</div></div>
-      <div class="stat"><div class="sv" id="stCode">-</div><div class="sk">CODE</div></div>
-      <div class="stat"><div class="sv" id="stChk">-</div><div class="sk">CHECKSUM</div></div>
-      <div class="stat"><div class="sv" id="stReg">-</div><div class="sk">REGION</div></div>
+      <div class="stat"><div class="sv" id="stSize">—</div><div class="sk">SIZE</div></div>
+      <div class="stat"><div class="sv" id="stCode">—</div><div class="sk">CODE</div></div>
+      <div class="stat"><div class="sv" id="stChk">—</div><div class="sk">CHECKSUM</div></div>
+      <div class="stat"><div class="sv" id="stReg">—</div><div class="sk">REGION</div></div>
     </div>
   </div>
-  <div class="card">
-    <div class="ct">// COME SI USA</div>
-    <div class="hs">
-      <div class="hst"><div class="hn">1</div><div class="htx">Carica la ROM <strong>.GBA</strong> — tutto si compila da solo</div></div>
-      <div class="hst"><div class="hn">2</div><div class="htx"><strong>VC Base scaricato automaticamente</strong> dalla repo</div></div>
-      <div class="hst"><div class="hn">3</div><div class="htx">Controlla/modifica la config</div></div>
-      <div class="hst"><div class="hn">4</div><div class="htx">Avvia iniezione e scarica il CIA</div></div>
-      <div class="hst"><div class="hn">5</div><div class="htx">Installa con <strong>FBI</strong> o <strong>GodMode9</strong> su N3DS CFW</div></div>
+  <div class="card" id="vcSideCard">
+    <div class="ct">// VC BASE</div>
+    <div id="vcSideStatus" style="font-family:var(--mono);font-size:8.5px;color:var(--t3);line-height:1.8;">
+      In attesa...
     </div>
   </div>
-  <div class="alert alert-a" style="margin:0;">
-    <strong>REQUISITI 3DS</strong>
-    New Nintendo 3DS<br>
-    CFW Luma3DS + sigpatches<br>
-    FBI Manager o GodMode9<br>
-    VC Base estratto da eShop/GodMode9
-  </div>
-  <div class="card">
-    <div class="ct">// TECH</div>
-    <div class="tr"><span class="tn">CIA Parser</span><span class="badge bg">JS Pure</span></div>
-    <div class="tr"><span class="tn">SHA-256</span><span class="badge bg">WebCrypto</span></div>
-    <div class="tr"><span class="tn">VC Base</span><span class="badge bg">Auto-fetch</span></div>
-    <div class="tr"><span class="tn">Server</span><span class="badge bg">Nessuno</span></div>
-  </div>
-  <div class="card">
-    <div class="ct">// LINK UTILI</div>
-    <a class="lnk" href="https://3ds.hacks.guide" target="_blank" rel="noopener">3ds.hacks.guide</a>
-    <a class="lnk" href="https://github.com/LumaTeam/Luma3DS" target="_blank" rel="noopener">Luma3DS</a>
-    <a class="lnk" href="https://github.com/Steveice10/FBI" target="_blank" rel="noopener">FBI Manager</a>
-    <a class="lnk" href="https://github.com/d0k3/GodMode9" target="_blank" rel="noopener">GodMode9</a>
-    <a class="lnk" href="https://github.com/Nazaretmax/nsui-web" target="_blank" rel="noopener">GitHub del progetto</a>
-  </div>
-</div>
+</div><!-- /sidebar -->
 </div><!-- /app -->
 
 <footer>
@@ -731,15 +648,6 @@ function parseTMD(buf,base){
     chunks.push({hashAbsOff:base+b2+0x10});
   }
   return{sd,cc,iho,iro,cro,chunks,ihoAbs:base+iho,iroAbs:base+iro,croAbs:base+cro};
-}
-function detectOrigSz(cia,romStart){
-  const sizes=[32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536].map(k=>k*1024);
-  for(const sz of sizes){
-    const end=romStart+sz; if(end>cia.length) break;
-    const s=cia.subarray(end,end+Math.min(64,cia.length-end));
-    if(s.every(b=>b===0xFF||b===0x00)) return sz;
-  }
-  return Math.max(0,S.cia.info.off.content+Number(S.cia.info.contentSize)-romStart);
 }
 
 // ── UI HELPERS
@@ -1020,16 +928,20 @@ cia[off_tmd+sd_off+0xA4:off_tmd+sd_off+0xA4+32]=hashlib.sha256(bytes(cia[iro_abs
 py_logs.append(f'[STEP6] TMD hash: {new_ch.hex()[:16].upper()}...')
 py_logs.append(f'[DONE] OK · {len(cia):,}B')
 
-py_cia_out = bytes(cia)
+import base64 as _b64
+py_cia_b64  = _b64.b64encode(bytes(cia)).decode()
 py_hash_out = new_ch.hex().upper()
+py_logs.append(f'[DONE] OK · {len(cia):,}B · SHA256={new_ch.hex()[:16].upper()}...')
 `);
 
-    // Read results from Python globals
-    const outBytes = new Uint8Array(pyodide.globals.get('py_cia_out').toJs());
-    const pyLogs   = pyodide.globals.get('py_logs').toJs();
-    const outHash  = pyodide.globals.get('py_hash_out');
+    // Read results via base64 (most reliable cross-Python/JS method)
+    const b64     = pyodide.globals.get('py_cia_b64');
+    const binary  = atob(b64);
+    const outBytes = new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++) outBytes[i]=binary.charCodeAt(i);
+    const pyLogs  = Array.from(pyodide.globals.get('py_logs'));
+    const outHash = pyodide.globals.get('py_hash_out');
 
-    // Show Python logs in our UI
     // Show Python logs in our UI
     setStep(0,'done'); setStep(1,'done'); setPrg(30,'ROM iniettata...');
     for(const l of pyLogs){
@@ -1106,6 +1018,8 @@ document.getElementById('resetBtn').addEventListener('click',()=>{
     S.cia.info=info;
     renderCiaInfo(info,'conv.cia');
     setVcStatus('ok','VC Base pronto','conv.cia · '+fsz(bytes.length)+' · caricato da repo');
+    const vs=document.getElementById('vcSideStatus');
+    if(vs) vs.innerHTML='<span style="color:var(--green);">✓ conv.cia</span><br><span style="color:var(--t2);">'+fsz(bytes.length)+'</span>';
     document.getElementById('vcBadge').innerHTML='<span class="badge bg" style="font-size:7px;">OK</span>';
     checkReady();
     console.log('[NSUI] conv.cia caricato OK:',fsz(bytes.length));
