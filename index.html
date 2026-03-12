@@ -1052,11 +1052,11 @@ log(f'[DONE] Verifica OK · {len(cia):,}B · {new_content_hash.hex()[:16].upper(
 {'cia': bytes(cia), 'logs': logs, 'size': len(cia), 'hash': new_content_hash.hex().upper()}
 `);
 
-    // Parse Python result
-    const pyResult = result.toJs ? result.toJs({dict_converter: Object.fromEntries}) : result;
-    const outBytes = new Uint8Array(pyResult.get('cia'));
-    const pyLogs   = pyResult.get('logs');
-    const outHash  = pyResult.get('hash');
+    // Parse Python result — Pyodide returns a Map, convert to plain JS object
+    const pyMap = result.toJs ? result.toJs() : result;
+    const outBytes = new Uint8Array(pyMap.get('cia'));
+    const pyLogs   = Array.from(pyMap.get('logs'));
+    const outHash  = pyMap.get('hash');
 
     // Show Python logs in our UI
     setStep(0,'done'); setStep(1,'done'); setPrg(30,'ROM iniettata...');
