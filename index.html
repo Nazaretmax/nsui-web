@@ -489,6 +489,47 @@ details summary{list-style:none;}.details summary::-webkit-details-marker{displa
     <div class="div"></div>
 
 
+<!-- 04 CONVERSIONE -->
+<div class="panel" id="panelConv">
+  <div class="ph"><div class="phn">04</div>CONVERSIONE &amp; OUTPUT</div>
+  <div class="pb">
+    <button class="btn btn-go" id="convertBtn" disabled>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      AVVIA INIEZIONE CIA
+    </button>
+    <div class="prg" id="prgW">
+      <div class="prg-h"><span id="prgL">Inizializzazione...</span><span id="prgP">0%</span></div>
+      <div class="prg-tr"><div class="prg-fill" id="prgB"></div></div>
+    </div>
+    <div id="log"></div>
+    <div class="steps" id="stepsEl">
+      <div class="si" id="s0"><div class="sn">1</div><div class="stxt">Validazione ROM GBA</div></div>
+      <div class="si" id="s1"><div class="sn">2</div><div class="stxt">Parsing CIA Base</div></div>
+      <div class="si" id="s2"><div class="sn">3</div><div class="stxt">Localizzazione ROM nel CIA</div></div>
+      <div class="si" id="s3"><div class="sn">4</div><div class="stxt">Iniezione payload ROM</div></div>
+      <div class="si" id="s4"><div class="sn">5</div><div class="stxt">Hash ExeFS + Superblock</div></div>
+      <div class="si" id="s5"><div class="sn">6</div><div class="stxt">Ricalcolo SHA-256 TMD</div></div>
+      <div class="si" id="s6"><div class="sn">7</div><div class="stxt">CIA assemblato</div></div>
+    </div>
+    <div class="out" id="outCard">
+      <div class="out-t">CIA PRONTO</div>
+      <div class="out-meta">
+        <div class="om"><span class="omk">FILENAME</span><span class="omv" id="outName">—</span></div>
+        <div class="om"><span class="omk">SIZE</span><span class="omv" id="outSize">—</span></div>
+        <div class="om"><span class="omk">SHA-256</span><span class="omv" id="outHash" style="font-family:var(--mono);font-size:8px;">—</span></div>
+        <div class="om"><span class="omk">FORMAT</span><span class="omv">Nintendo CIA v2</span></div>
+      </div>
+      <button class="btn btn-dl" id="dlBtn">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        SCARICA .CIA
+      </button>
+    </div>
+    <div style="margin-top:9px;">
+      <button class="btn btn-gh" id="resetBtn">RESET ROM</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /main -->
 
 <div class="sidebar">
