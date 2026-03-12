@@ -792,6 +792,19 @@ function renderCiaInfo(info,filename){
 }
 
 // ── ICON
+function drawFallbackIcon(ctx, title){
+  const code = title.slice(0,4).toUpperCase();
+  const cols=['#003d8f','#8f0030','#005c2b','#5c0070','#7a3800'];
+  ctx.fillStyle=cols[Math.abs((title.charCodeAt(0)||65))%cols.length];
+  ctx.fillRect(0,0,48,48);
+  const g=ctx.createLinearGradient(0,0,48,48);
+  g.addColorStop(0,'rgba(255,255,255,.12)');g.addColorStop(1,'rgba(0,0,0,.22)');
+  ctx.fillStyle=g;ctx.fillRect(0,0,48,48);
+  ctx.fillStyle='rgba(255,255,255,.9)';ctx.font='bold 10px monospace';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(code,24,25);
+}
+
 function autoGenIcon(info){
   const c=document.createElement('canvas');c.width=48;c.height=48;
   const x=c.getContext('2d');
@@ -883,97 +896,38 @@ document.getElementById('convertBtn').addEventListener('click', async()=>{
     const pyodide = window._pyodide;
 
     setStep(0,'active'); setPrg(8,'Caricamento dati...');
-    // Pass bytes to Python via JS globals
-    pyodide.globals.set('cia_bytes', S.cia.bytes);
-    pyodide.globals.set('rom_bytes', S.rom.bytes);
+
+    // Pass bytes + metadata to Python (icon generated pure Python-side)
+    pyodide.globals.set('cia_bytes',   S.cia.bytes);
+    pyodide.globals.set('rom_bytes',   S.rom.bytes);
+    pyodide.globals.set('smdh_title',  document.getElementById('gameTitle').value||title);
+    pyodide.globals.set('smdh_long',   document.getElementById('gameDesc').value||title);
+    pyodide.globals.set('smdh_pub',    document.getElementById('gamePublisher').value||'');
+    // If user uploaded custom icon, pass as base64
+    if(S.icon){
+      const iconCanvas=document.createElement('canvas');iconCanvas.width=48;iconCanvas.height=48;
+      const iconCtx=iconCanvas.getContext('2d');
+      await new Promise(resolve=>{
+        const img=new Image();
+        img.onload=()=>{iconCtx.drawImage(img,0,0,48,48);resolve();};
+        img.onerror=()=>resolve();
+        img.src=URL.createObjectURL(S.icon instanceof Blob?S.icon:new Blob([S.icon]));
+      });
+      const rgba=iconCtx.getImageData(0,0,48,48).data;
+      const b64arr=btoa(String.fromCharCode(...rgba));
+      pyodide.globals.set('icon_rgba_b64', b64arr);
+    } else {
+      pyodide.globals.set('icon_rgba_b64', '');
+    }
+
     logln('dim','[ROM] '+S.rom.file.name+' · '+fsz(S.rom.bytes.length));
     logln('dim','[CIA] '+(S.cia.file?.name||'conv.cia')+' · '+fsz(S.cia.bytes.length));
-
+    logln('dim','[ICON] 48x48 RGBA pronta · '+iconRgba.length+' bytes');
     setPrg(12,'Esecuzione Python...');
 
     // ── Run Python injection (exact same code that works)
-    await pyodide.runPythonAsync(`
-import struct, hashlib
-
-cia = bytearray(cia_bytes.to_py())
-rom = bytes(rom_bytes.to_py())
-py_logs = []
-
-def u32le(b,o): return struct.unpack_from('<I',b,o)[0]
-def u32be(b,o): return struct.unpack_from('>I',b,o)[0]
-def u64le(b,o): return struct.unpack_from('<Q',b,o)[0]
-def align(v,a): return v if v%a==0 else v+(a-v%a)
-def setU32(b,o,v): struct.pack_into('<I',b,o,v)
-def setU64(b,o,v): struct.pack_into('<Q',b,o,v)
-
-hdr_size=u32le(cia,0); cert_size=u32le(cia,8)
-ticket_size=u32le(cia,0xC); tmd_size=u32le(cia,0x10)
-off_cert=align(hdr_size,64); off_ticket=align(off_cert+cert_size,64)
-off_tmd=align(off_ticket+ticket_size,64); off_content=align(off_tmd+tmd_size,64)
-content_size=u64le(cia,0x18)
-nb=off_content
-assert cia[nb+0x100:nb+0x104]==b'NCCH', 'NCCH magic non trovato'
-py_logs.append(f'[STEP1] CIA OK · content @ 0x{off_content:X}')
-
-exefs_off_mu=u32le(cia,nb+0x1A0)
-exefs_base=nb+exefs_off_mu*0x200
-exefs_data=exefs_base+0x200
-py_logs.append(f'[STEP2] ExeFS @ 0x{exefs_base:X}')
-
-code_entry=None
-for i in range(10):
-    eo=exefs_base+i*0x10
-    name=bytes(cia[eo:eo+8]).rstrip(b'\x00').decode('ascii','replace')
-    if not name: continue
-    foff=u32le(cia,eo+8); fsize=u32le(cia,eo+0xC)
-    fabs=exefs_data+foff
-    hash_off=exefs_base+0x1E0-i*0x20
-    py_logs.append(f'[STEP2] [{i}] "{name}" {fsize:,}B')
-    if name.startswith('.code'):
-        code_entry={'eo':eo,'foff':foff,'fsize':fsize,'fabs':fabs,'hash_off':hash_off,'idx':i}
-
-assert code_entry is not None, '.code non trovato. Usa un CIA VC GBA valido.'
-
-GBA_LOGO=bytes([0x24,0xFF,0xAE,0x51,0x69,0x9A,0xA2,0x21,0x3D,0x84,0x82,0x0A,
-                0x84,0xE4,0x09,0xAD,0x11,0x24,0x8B,0x98,0xC0,0x81,0x7F,0x21,
-                0xA3,0x52,0xBE,0x19,0x93,0x09,0xCE,0x20])
-assert bytes(cia).find(GBA_LOGO,code_entry['fabs'])>=0, 'GBA Logo non trovato. CIA non e GBA VC valido.'
-py_logs.append(f'[STEP3] ROM={len(rom):,}B Footer={max(0,code_entry["fsize"]-len(rom))}B')
-
-cia[code_entry['fabs']:code_entry['fabs']+len(rom)]=rom
-footer=max(0,code_entry['fsize']-len(rom))
-orig_rom=code_entry['fsize']-footer
-if len(rom)<orig_rom:
-    cia[code_entry['fabs']+len(rom):code_entry['fabs']+orig_rom]=b'\xff'*(orig_rom-len(rom))
-py_logs.append('[STEP3] Iniezione OK')
-
-code_data=bytes(cia[code_entry['fabs']:code_entry['fabs']+code_entry['fsize']])
-new_code_hash=hashlib.sha256(code_data).digest()
-cia[code_entry['hash_off']:code_entry['hash_off']+32]=new_code_hash
-py_logs.append(f'[STEP4] .code hash: {new_code_hash.hex()[:16]}...')
-
-new_sb=hashlib.sha256(bytes(cia[exefs_base:exefs_base+0x200])).digest()
-cia[nb+0x1C0:nb+0x1E0]=new_sb
-py_logs.append(f'[STEP4] ExeFS SB: {new_sb.hex()[:16]}...')
-
-sig_type=u32be(cia,off_tmd)
-sig_len={0x10003:0x100,0x10004:0x100,0x10005:0x3C}.get(sig_type,0x100)
-sd_off=((4+sig_len+63)//64)*64
-cc=(cia[off_tmd+sd_off+0x9E]<<8)|cia[off_tmd+sd_off+0x9F]
-iro_abs=off_tmd+sd_off+0xC4
-cro_abs=iro_abs+64*36
-new_ch=hashlib.sha256(bytes(cia[off_content:off_content+content_size])).digest()
-cia[cro_abs+0x10:cro_abs+0x30]=new_ch
-cia[iro_abs+4:iro_abs+36]=hashlib.sha256(bytes(cia[cro_abs:cro_abs+cc*0x30])).digest()
-cia[off_tmd+sd_off+0xA4:off_tmd+sd_off+0xA4+32]=hashlib.sha256(bytes(cia[iro_abs:iro_abs+64*36])).digest()
-py_logs.append(f'[STEP6] TMD hash: {new_ch.hex()[:16].upper()}...')
-py_logs.append(f'[DONE] OK · {len(cia):,}B')
-
-import base64 as _b64
-py_cia_b64  = _b64.b64encode(bytes(cia)).decode()
-py_hash_out = new_ch.hex().upper()
-py_logs.append(f'[DONE] OK · {len(cia):,}B · SHA256={new_ch.hex()[:16].upper()}...')
-`);
+    const pyCode = document.getElementById('pycode').textContent;
+    await pyodide.runPythonAsync(pyCode);
 
     // Read results via base64 (most reliable cross-Python/JS method)
     const b64     = pyodide.globals.get('py_cia_b64');
@@ -1077,6 +1031,239 @@ document.getElementById('resetBtn').addEventListener('click',()=>{
     box.parentNode.appendChild(retryBtn);
   }
 })();
+</script>
+
+<script id="pycode" type="text/plain">
+import struct, hashlib
+
+import struct as _st, hashlib, base64 as _b64
+import struct
+cia = bytearray(cia_bytes.to_py())
+rom = bytes(rom_bytes.to_py())
+smdh_title_str = str(smdh_title)
+smdh_long_str  = str(smdh_long)
+smdh_pub_str   = str(smdh_pub)
+_icon_b64 = str(icon_rgba_b64)
+# Decode user icon if provided, otherwise generate from game code
+if _icon_b64:
+    icon_rgba_raw = _b64.b64decode(_icon_b64)
+else:
+    icon_rgba_raw = None  # will use pure Python generator below
+py_logs = []
+
+def u32le(b,o): return struct.unpack_from('<I',b,o)[0]
+def u32be(b,o): return struct.unpack_from('>I',b,o)[0]
+def u64le(b,o): return struct.unpack_from('<Q',b,o)[0]
+def align(v,a): return v if v%a==0 else v+(a-v%a)
+def setU32(b,o,v): struct.pack_into('<I',b,o,v)
+def setU64(b,o,v): struct.pack_into('<Q',b,o,v)
+
+hdr_size=u32le(cia,0); cert_size=u32le(cia,8)
+ticket_size=u32le(cia,0xC); tmd_size=u32le(cia,0x10)
+off_cert=align(hdr_size,64); off_ticket=align(off_cert+cert_size,64)
+off_tmd=align(off_ticket+ticket_size,64); off_content=align(off_tmd+tmd_size,64)
+content_size=u64le(cia,0x18)
+nb=off_content
+assert cia[nb+0x100:nb+0x104]==b'NCCH', 'NCCH magic non trovato'
+py_logs.append(f'[STEP1] CIA OK · content @ 0x{off_content:X}')
+
+exefs_off_mu=u32le(cia,nb+0x1A0)
+exefs_base=nb+exefs_off_mu*0x200
+exefs_data=exefs_base+0x200
+py_logs.append(f'[STEP2] ExeFS @ 0x{exefs_base:X}')
+
+code_entry=None
+for i in range(10):
+    eo=exefs_base+i*0x10
+    name=bytes(cia[eo:eo+8]).rstrip(b'\x00').decode('ascii','replace')
+    if not name: continue
+    foff=u32le(cia,eo+8); fsize=u32le(cia,eo+0xC)
+    fabs=exefs_data+foff
+    hash_off=exefs_base+0x1E0-i*0x20
+    py_logs.append(f'[STEP2] [{i}] "{name}" {fsize:,}B')
+    if name.startswith('.code'):
+        code_entry={'eo':eo,'foff':foff,'fsize':fsize,'fabs':fabs,'hash_off':hash_off,'idx':i}
+
+assert code_entry is not None, '.code non trovato. Usa un CIA VC GBA valido.'
+
+GBA_LOGO=bytes([0x24,0xFF,0xAE,0x51,0x69,0x9A,0xA2,0x21,0x3D,0x84,0x82,0x0A,
+                0x84,0xE4,0x09,0xAD,0x11,0x24,0x8B,0x98,0xC0,0x81,0x7F,0x21,
+                0xA3,0x52,0xBE,0x19,0x93,0x09,0xCE,0x20])
+assert bytes(cia).find(GBA_LOGO,code_entry['fabs'])>=0, 'GBA Logo non trovato. CIA non e GBA VC valido.'
+py_logs.append(f'[STEP3] ROM={len(rom):,}B Footer={max(0,code_entry["fsize"]-len(rom))}B')
+
+cia[code_entry['fabs']:code_entry['fabs']+len(rom)]=rom
+footer=max(0,code_entry['fsize']-len(rom))
+orig_rom=code_entry['fsize']-footer
+if len(rom)<orig_rom:
+    cia[code_entry['fabs']+len(rom):code_entry['fabs']+orig_rom]=b'\xff'*(orig_rom-len(rom))
+py_logs.append('[STEP3] Iniezione OK')
+
+code_data=bytes(cia[code_entry['fabs']:code_entry['fabs']+code_entry['fsize']])
+new_code_hash=hashlib.sha256(code_data).digest()
+cia[code_entry['hash_off']:code_entry['hash_off']+32]=new_code_hash
+py_logs.append(f'[STEP4] .code hash: {new_code_hash.hex()[:16]}...')
+
+# ── STEP 5: SMDH icon patch (title + publisher + icon)
+# Find icon entry in ExeFS
+icon_entry = None
+for i in range(10):
+    eo2=exefs_base+i*0x10
+    nm=bytes(cia[eo2:eo2+8]).rstrip(b'\x00').decode('ascii','replace')
+    if nm=='icon':
+        foff2=u32le(cia,eo2+8); fsize2=u32le(cia,eo2+0xC)
+        fabs2=exefs_data+foff2
+        hash_off2=exefs_base+0x1E0-i*0x20
+        icon_entry={'fabs':fabs2,'fsize':fsize2,'hash_off':hash_off2}
+        break
+
+if icon_entry and bytes(cia[icon_entry['fabs']:icon_entry['fabs']+4])==b'SMDH':
+    smdh_start=icon_entry['fabs']
+
+    # Patch titles in all 12 languages
+    t_enc = smdh_title_str.encode('utf-16-le')[:0x80].ljust(0x80,b'\x00')
+    l_enc = smdh_long_str.encode('utf-16-le')[:0x100].ljust(0x100,b'\x00')
+    p_enc = smdh_pub_str.encode('utf-16-le')[:0x80].ljust(0x80,b'\x00')
+    for lang in range(12):
+        off=smdh_start+0x08+lang*0x200
+        cia[off:off+0x80]=t_enc
+        cia[off+0x80:off+0x180]=l_enc
+        cia[off+0x180:off+0x200]=p_enc
+    py_logs.append(f'[STEP5] SMDH title: {smdh_title_str!r} / {smdh_pub_str!r}')
+
+    # Convert RGBA icon to RGB565 Nintendo tiled format
+    TILE_ORDER=[0,1,8,9,2,3,10,11,16,17,24,25,18,19,26,27,
+                4,5,12,13,6,7,14,15,20,21,28,29,22,23,30,31,
+                32,33,40,41,34,35,42,43,48,49,56,57,50,51,58,59,
+                36,37,44,45,38,39,46,47,52,53,60,61,54,55,62,63]
+    def to_rgb565_tiled(rgba,w,h):
+        out=bytearray(w*h*2); tw,th=w//8,h//8
+        for ty in range(th):
+            for tx in range(tw):
+                for i,t in enumerate(TILE_ORDER):
+                    px_x=tx*8+(t%8);px_y=ty*8+(t//8)
+                    idx=(px_y*w+px_x)*4
+                    r,g,b=rgba[idx],rgba[idx+1],rgba[idx+2]
+                    struct.pack_into('<H',out,((ty*tw+tx)*64+i)*2,((r>>3)<<11)|((g>>2)<<5)|(b>>3))
+        return bytes(out)
+    def downscale(rgba,sw,sh,dw,dh):
+        out=bytearray(dw*dh*4); sx=sw//dw; sy=sh//dh
+        for y in range(dh):
+            for x in range(dw):
+                r=g=b=a=0; n=sx*sy
+                for dy in range(sy):
+                    for dx in range(sx):
+                        i=((y*sy+dy)*sw+(x*sx+dx))*4
+                        r+=rgba[i];g+=rgba[i+1];b+=rgba[i+2];a+=rgba[i+3]
+                i2=(y*dw+x)*4;out[i2]=r//n;out[i2+1]=g//n;out[i2+2]=b//n;out[i2+3]=a//n
+        return bytes(out)
+    def make_icon_rgba(title,code,w,h):
+        PAL=[(0,61,143),(143,0,48),(0,92,43),(92,0,112),(122,56,0),(0,80,112),(112,80,0)]
+        c=PAL[ord(code[0])%len(PAL)] if code else PAL[0]
+        rgba=bytearray(w*h*4)
+        for y in range(h):
+            for x in range(w):
+                bl=(x+y)/(w+h); r2=int(c[0]*(1-bl*0.4)); g2=int(c[1]*(1-bl*0.4)); b2=int(c[2]*(1-bl*0.4))
+                idx=(y*w+x)*4; rgba[idx]=r2; rgba[idx+1]=g2; rgba[idx+2]=b2; rgba[idx+3]=255
+        FONT={'A':'01110 10001 11111 10001 10001','B':'11110 10001 11110 10001 11110',
+              'C':'01111 10000 10000 10000 01111','D':'11110 10001 10001 10001 11110',
+              'E':'11111 10000 11110 10000 11111','F':'11111 10000 11110 10000 10000',
+              'G':'01111 10000 10111 10001 01111','H':'10001 10001 11111 10001 10001',
+              'I':'11111 00100 00100 00100 11111','J':'00111 00010 00010 10010 01100',
+              'K':'10001 10010 11100 10010 10001','L':'10000 10000 10000 10000 11111',
+              'M':'10001 11011 10101 10001 10001','N':'10001 11001 10101 10011 10001',
+              'O':'01110 10001 10001 10001 01110','P':'11110 10001 11110 10000 10000',
+              'Q':'01110 10001 10101 10010 01101','R':'11110 10001 11110 10100 10011',
+              'S':'01111 10000 01110 00001 11110','T':'11111 00100 00100 00100 00100',
+              'U':'10001 10001 10001 10001 01110','V':'10001 10001 10001 01010 00100',
+              'W':'10001 10001 10101 11011 10001','X':'10001 01010 00100 01010 10001',
+              'Y':'10001 01010 00100 00100 00100','Z':'11111 00010 00100 01000 11111',
+              ' ':'00000 00000 00000 00000 00000','-':'00000 00000 11111 00000 00000'}
+        label=title[:4].upper(); tw2=len(label)*4-1; sx2=(w-tw2)//2; sy2=h//2-3
+        for ci3,ch in enumerate(label):
+            rows=FONT.get(ch,FONT['X']).split()
+            for ri,row in enumerate(rows):
+                for col_i,bit in enumerate(row):
+                    if bit=='1':
+                        px=sx2+ci3*4+col_i; py=sy2+ri
+                        if 0<=px<w and 0<=py<h:
+                            idx=(py*w+px)*4; rgba[idx]=255; rgba[idx+1]=255; rgba[idx+2]=255
+        return bytes(rgba)
+    gba_code_str=rom[0xAC:0xB0].decode('ascii','replace')
+    if icon_rgba_raw and len(icon_rgba_raw)==48*48*4:
+        rgba48=icon_rgba_raw
+        py_logs.append('[STEP5] Icona utente 48x48')
+    else:
+        rgba48=make_icon_rgba(smdh_title_str,gba_code_str,48,48)
+        py_logs.append(f'[STEP5] Icona auto (code={gba_code_str})')
+    rgba24=downscale(rgba48,48,48,24,24)
+    icon48=to_rgb565_tiled(rgba48,48,48)
+    icon24=to_rgb565_tiled(rgba24,24,24)
+
+    # Write icons into SMDH (SMDH has 16 lang entries=0x2000, then settings 0x40, then icons)
+    cia[smdh_start+0x2040:smdh_start+0x2040+0x480]=icon24
+    cia[smdh_start+0x24C0:smdh_start+0x24C0+0x1200]=icon48
+    py_logs.append(f'[STEP5] Icona 24x24+48x48 scritta nel SMDH')
+
+    # Update icon ExeFS hash
+    new_icon_hash=hashlib.sha256(bytes(cia[icon_entry['fabs']:icon_entry['fabs']+icon_entry['fsize']])).digest()
+    cia[icon_entry['hash_off']:icon_entry['hash_off']+32]=new_icon_hash
+    py_logs.append(f'[STEP5] Icon hash: {new_icon_hash.hex()[:16]}...')
+else:
+    py_logs.append('[STEP5] SMDH non trovato, skip patch icona')
+
+# ── STEP 5b: Patch Title ID in Ticket + TMD
+# Parse ticket
+def parse_sig_offset(buf, base):
+    st = u32be(buf, base)
+    sl = {0x10003:0x100,0x10004:0x100,0x10005:0x3C}.get(st,0x100)
+    return ((4+sl+63)//64)*64
+
+tik_body_off = parse_sig_offset(cia, off_ticket)
+tmd_body_off = parse_sig_offset(cia, off_tmd)
+
+# Build Title ID from GBA game code (4 ASCII chars at ROM+0xAC)
+# GBA code is unique per game — same approach as real VC injectors
+# Format: 00040000 + ASCII bytes of game code + 00
+current_tid = bytes(cia[off_ticket+tik_body_off+0x09C:off_ticket+tik_body_off+0x09C+8])
+py_logs.append(f'[STEP5b] TID originale: {current_tid.hex().upper()}')
+
+# Read 4-char game code directly from GBA ROM header (offset 0xAC)
+gba_code = bytes(rom[0xAC:0xB0])  # e.g. b'AREE' for Mega Man BN
+# Title ID: 00 04 00 00 + 4 game code bytes (big-endian ASCII)
+new_tid_full = bytes([0x00,0x04,0x00,0x00]) + gba_code
+py_logs.append(f'[STEP5b] GBA code: {gba_code.decode("ascii","replace")} → TID: {new_tid_full.hex().upper()}')
+
+# Write to Ticket
+tid_tik_abs = off_ticket + tik_body_off + 0x09C
+cia[tid_tik_abs:tid_tik_abs+8] = new_tid_full
+# Write to TMD
+tid_tmd_abs = off_tmd + tmd_body_off + 0x04C
+cia[tid_tmd_abs:tid_tmd_abs+8] = new_tid_full
+py_logs.append(f'[STEP5b] Nuovo TID: {new_tid_full.hex().upper()}')
+
+new_sb=hashlib.sha256(bytes(cia[exefs_base:exefs_base+0x200])).digest()
+cia[nb+0x1C0:nb+0x1E0]=new_sb
+py_logs.append(f'[STEP4] ExeFS SB: {new_sb.hex()[:16]}...')
+
+sig_type=u32be(cia,off_tmd)
+sig_len={0x10003:0x100,0x10004:0x100,0x10005:0x3C}.get(sig_type,0x100)
+sd_off=((4+sig_len+63)//64)*64
+cc=(cia[off_tmd+sd_off+0x9E]<<8)|cia[off_tmd+sd_off+0x9F]
+iro_abs=off_tmd+sd_off+0xC4
+cro_abs=iro_abs+64*36
+new_ch=hashlib.sha256(bytes(cia[off_content:off_content+content_size])).digest()
+cia[cro_abs+0x10:cro_abs+0x30]=new_ch
+cia[iro_abs+4:iro_abs+36]=hashlib.sha256(bytes(cia[cro_abs:cro_abs+cc*0x30])).digest()
+cia[off_tmd+sd_off+0xA4:off_tmd+sd_off+0xA4+32]=hashlib.sha256(bytes(cia[iro_abs:iro_abs+64*36])).digest()
+py_logs.append(f'[STEP6] TMD hash: {new_ch.hex()[:16].upper()}...')
+py_logs.append(f'[DONE] OK · {len(cia):,}B')
+
+import base64 as _b64
+py_cia_b64  = _b64.b64encode(bytes(cia)).decode()
+py_hash_out = new_ch.hex().upper()
+py_logs.append(f'[DONE] OK · {len(cia):,}B · SHA256={new_ch.hex()[:16].upper()}...')
+
 </script>
 </body>
 </html>
